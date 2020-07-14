@@ -1,0 +1,134 @@
+<template>
+  <view class="custom-audio">
+    <image @click="playOrStopAudio" :src="audioImg" class="audio-btn" />
+    <text>{{ fmtSecond(currentTime) }}/{{ fmtSecond(duration) }}</text>
+  </view>
+</template>
+
+<script>
+import dayjs from 'dayjs'
+import { formatSecondToMinSecond } from '../../lib/Utils'
+const iconPaused = '../../static/images/icon_paused.png'
+const iconPlaying = '../../static/images/icon_playing.png'
+const iconStop = '../../static/images/icon_stop.png'
+const iconLoading = '../../static/images/icon_loading.gif'
+export default {
+  name: 'CustomAudio',
+  props: {
+    audioSrc: {
+      type: String,
+      default: ''
+    }
+  },
+  data() {
+    return {
+      audioCtx: undefined,
+      duration: 0,
+      currentTime: 0,
+      audioImg: iconLoading,
+    }
+  },
+  watch: {
+    audioSrc: {
+      handler(newSrc, oldSrc) {
+        console.log('watch', newSrc, oldSrc)
+        this.audioImg = iconLoading
+        this.currentTime = 0
+        this.duration = 0
+        if (this.audioCtx === undefined) {
+          this.audioCtx = uni.createInnerAudioContext()
+          this.onTimeUpdate = this.audioCtx.onTimeUpdate
+        }
+        if (this.audioCtx.play) {
+          this.audioCtx.stop()
+        }
+      }
+    }
+  },
+  mounted() {
+    this.audioCtx = uni.createInnerAudioContext()
+    this.audioCtx.src = this.audioSrc
+    this.audioCtx.startTime = 0
+    this.audioCtx.onTimeUpdate((e) => {
+      this.onTimeUpdate(e)
+    })
+    this.audioCtx.onCanplay((e) => {
+      this.onCanplay(e)
+    })
+    this.audioCtx.onPlay((e) => {
+      this.onPlay(e)
+    })
+    this.audioCtx.onEnded((e) => {
+      this.onEnded(e)
+    })
+    this.audioCtx.onError((e) => {
+      this.onError(e)
+    })
+    console.log('onLoad', this.audioCtx, this.audioSrc)
+  },
+  methods: {
+    playOrStopAudio() {
+      if (this.audioCtx === undefined) {
+        this.audioCtx = uni.createInnerAudioContext()
+        this.audioCtx.src = this.audioSrc
+        this.onTimeUpdate = this.audioCtx.onTimeUpdate
+        this.onCanplay = this.audioCtx.onCanplay
+      }
+      if (this.audioCtx.paused) {
+        this.audioCtx.play()
+        this.audioImg = iconPlaying
+      } else {
+        this.audioCtx.pause()
+        this.audioImg = iconPaused
+      }
+    },
+    onTimeUpdate(e) {
+      // console.log('onTimeUpdate', this.audioCtx.duration, this.audioCtx.currentTime)
+      if (this.currentTime !== Math.floor(this.audioCtx.currentTime)) {
+        this.currentTime = Math.floor(this.audioCtx.currentTime)
+      }
+    },
+    onCanplay(e) {
+      this.audioImg = iconPaused
+      // console.log('onCanplay', e)
+    },
+    onPlay(e) {
+      this.duration = Math.floor(this.audioCtx.duration)
+    },
+    onEnded(e) {
+      this.audioImg = iconStop
+    },
+    onError(e) {
+      uni.showToast({
+        title: '音频加载失败',
+        icon: 'none'
+      })
+      throw new Error(e.errMsg, e.errCode)
+    },
+    fmtSecond(sec) {
+      const { min, second } = formatSecondToMinSecond(sec)
+      return `${min}:${second}`
+    }
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.custom-audio {
+  border-radius: 8vw;
+  border: #CCC 1px solid;
+  background: $default-bgcolor;
+  color: #333;
+  display: flex;
+  flex-flow: row no-wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2vw 5vw;
+  font-size: 14px;
+  .audio-btn {
+    width: 10vw;
+    height: 10vw;
+    margin-right: 2vw;
+  }
+}
+</style>

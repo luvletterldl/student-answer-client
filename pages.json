@@ -1,0 +1,47 @@
+{
+  "easycom": {
+    "^u-(.*)": "uview-ui/components/u-$1/u-$1.vue"
+  },
+	"pages": [
+    {
+      "path" : "pages/initPage/initPage",
+      "style" : {}
+    },
+    {
+      "path" : "pages/studyMission/studyMission",
+      "style" : {
+        "navigationBarTitleText": "学习任务"
+      }
+    },
+    {
+      "path" : "pages/singleLessonMisson/singleLessonMisson",
+      "style" : {
+        "navigationBarTitleText": "单课次任务"
+      }
+    },
+    {
+      "path" : "pages/answerPage/answerPage",
+      "style" : {
+        "navigationBarTitleText": "答题"
+      }
+    },
+    {
+      "path" : "pages/fillTopicAnswer/fillTopicAnswer",
+      "style" : {
+        "navigationBarTitleText": "答题"
+      }
+    },
+    {
+      "path" : "pages/spokenAnswer/spokenAnswer",
+      "style" : {
+        "navigationBarTitleText": "口语录入"
+      }
+    }
+  ],
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "",
+		"navigationBarBackgroundColor": "#F3F6FC",
+		"backgroundColor": "#F3F6FC"
+	}
+}

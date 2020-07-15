@@ -25,6 +25,7 @@ export default {
 		return {
       ctx: undefined,
 			studentAnswer: '',
+			studentAnswerList: [],
 			order: 0,
 			userId: 0,
 			index: 0,
@@ -34,6 +35,7 @@ export default {
 			studentId: 0,
 			examId: 0,
 			time: 0,
+			urls: [],
 		}
 	},
   onLoad(options) {
@@ -45,29 +47,20 @@ export default {
 		this.studentId = Number(options.studentId)
 		this.examId = Number(options.examId)
 		this.time = Number(options.time)
+		this.urls = JSON.parse(options.urls)
+		console.log(this.urls)
   },
 	onReady(){
 		this.ctx = uni.createCanvasContext('canId')
-		findExamQuestionList(this.examId, this.userId).then((res) => {
-			console.log('findExamQuestionList', res)
-			res.filter((v, i) => {
-				if (v.order === this.order) {
-					this.studentAnswer = v.studentAnswer
-				}
+		if (this.urls[this.index] !== '') {
+			uni.getImageInfo({
+				src: `${imgPreUrl}${this.urls[this.index]}`
+			}).then((res) => {
+				console.log(res)
+				this.ctx.drawImage(res[1].path, 0, 0, windowWidth, 400)
+				this.ctx.draw(true)
 			})
-			const studentAnswer = this.studentAnswer || ''
-			let studentAnswerList = studentAnswer.split('##')
-			if (studentAnswerList[this.index] !== '') {
-				console.log(studentAnswerList[this.index])
-				uni.getImageInfo({
-					src: `${imgPreUrl}${studentAnswerList[this.index]}`
-				}).then((res) => {
-					console.log(res)
-					this.ctx.drawImage(res[1].path, 0, 0, windowWidth, 400)
-					this.ctx.draw(true)
-				})
-			}
-		})
+		}
 	},
 	methods: {
     touchStart(e) {
@@ -111,17 +104,18 @@ export default {
         this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, 400)
         uploadImageToAliOss(this.classId, this.examId, tempFilePath).then((res) => {
 					console.log('uploadImageToAliOss', res)
-					const studentAnswerList = this.studentAnswer.split('##')
-					studentAnswerList[this.index] = res
-					studentAnswerList.forEach((v, i) => {
+					// const questionLength = 
+					const urls = this.urls
+					urls[this.index] = res
+					urls.forEach((v, i) => {
 						if (i !== 0) {
-							studentAnswerList[i] = `##${v}`
+							urls[i] = `##${v}`
 						}
 					})
 					currentServerTime().then(serverTime => {
 						examSubmit(this.examId, this.userId, serverTime, [{
 							order: this.order,
-							studentAnswer: studentAnswerList.toString().replace(/,/g, ''),
+							studentAnswer: urls.toString().replace(/,/g, ''),
 							time: this.time,
 						}]).then(() => {
 							this.back()

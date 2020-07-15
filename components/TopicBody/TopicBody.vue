@@ -17,7 +17,7 @@
       <view @click='selectBoolAnswer(false, question)' class='error' :class="trueOrFalse(question) === true ? '' : 'upToError'">错误</view>
     </view>
     <view v-if="question.questionType === QuestionType.FILL_BLANK_QUESTION" class='fill-blank'>
-      <view @click="toFillAnswer(index)" v-for="(item, index) in fmtFillAnswer(question)" :key="index" class="option">
+      <view @click="toFillAnswer(fmtFillAnswer(question), index)" v-for="(item, index) in fmtFillAnswer(question)" :key="index" class="option">
         <view class="option-index">{{ index + 1 }}</view>
         <text v-if='item === ""'>点击输入</text>
         <image v-else-if="item !== ''" :src='combineUrl(item)' class="fill-topic-img" />
@@ -54,7 +54,7 @@
 import Main from '../../lib/Main'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
-import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss } from '../../lib/Api'
+import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam } from '../../lib/Api'
 import { formatQuestionType, formatRichTextImg } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
@@ -64,6 +64,11 @@ export default {
     question: {
       type: Object,
       reuqired: true
+    },
+    subQuesIndex: {
+      type: Number,
+      reuqired: false,
+      default: undefined
     },
     questionIndex: {
       type: Number,
@@ -100,6 +105,14 @@ export default {
     storedTopic: {
       type: Function,
       reuqired: true
+    },
+    submitFlag: {
+      type: Number,
+      reuqired: true
+    },
+    updateSubmitFlag: {
+      type: Function,
+      reuqired: true
     }
   },
   components: {
@@ -124,27 +137,29 @@ export default {
   watch: {
     question: {
       handler(newQues, oldQues) {
-        if (oldQues) {
-          console.log('oldQues', oldQues, 'oldQues.questionType', oldQues.questionType)
-          if (oldQues.questionType === QuestionType.SINGLE_ANSWER_QUESTION || oldQues.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-            this.submitChoiceAnswer(oldQues)
-          } else if (oldQues.questionType === QuestionType.BOOL_ANSWER_QUESTION) {
-            this.submitBoolAnswer(oldQues)
-          }
-        }
-        if (newQues) {
-          console.log('newQues', newQues, 'newQues.questionType', newQues.questionType)
-          const type = newQues.questionType
-          const answer = newQues.studentAnswer
-          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-            if (answer !== null || answer !== '') {
-              this.selectedOptions = Array.from(answer.replace(/,/g, ''), (v) => { return parseInt(v)})
-            } else {
-              this.selectedOptions = []
+        if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1) {
+          if (oldQues) {
+            console.log('oldQues', oldQues, 'oldQues.questionType', oldQues.questionType)
+            if (oldQues.questionType === QuestionType.SINGLE_ANSWER_QUESTION || oldQues.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+              this.submitChoiceAnswer(oldQues)
+            } else if (oldQues.questionType === QuestionType.BOOL_ANSWER_QUESTION) {
+              this.submitBoolAnswer(oldQues)
             }
           }
-          if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-            this.boolStudentAnswer = answer === 'true' ? true : answer === 'false' ? false : null
+          if (newQues) {
+            console.log('newQues', newQues, 'newQues.questionType', newQues.questionType)
+            const type = newQues.questionType
+            const answer = newQues.studentAnswer || ''
+            if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+              if (answer !== '') {
+                this.selectedOptions = Array.from(answer.replace(/,/g, ''), (v) => { return parseInt(v)})
+              } else {
+                this.selectedOptions = []
+              }
+            }
+            if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+              this.boolStudentAnswer = answer === 'true' ? true : answer === 'false' ? false : null
+            }
           }
         }
       },
@@ -159,7 +174,29 @@ export default {
     storeFlag: {
       handler(newFlag, oldFlag) {
         if (newFlag === true) {
-          this.submitTopicWhenBoolOrChoice()
+          const type = this.question.questionType
+          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+              this.submitChoiceAnswer(this.question)
+            } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+              this.submitBoolAnswer(this.question)
+            }
+          if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
+            uni.showToast({
+              title: '暂存成功',
+              icon: 'success'
+            })
+            this.$emit('storedTopic')
+          }
+        }
+      }
+    },
+    submitFlag: {
+      handler(newFlag, oldFlag) {
+        if (newFlag === 0) {
+          const type = this.question.questionType
+          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
+            this.submitTopicWhenBoolOrChoice()
+          }
         }
       }
     }
@@ -230,9 +267,14 @@ export default {
     combineUrl(url) {
       return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
     },
-    afterStoreTopic(){
-      this.$emit('updateQuestionList')
-      if (this.storeFlag === true) {
+    isNeedUpdateSubmitFlag() {
+      if (this.submitFlag === 0) {
+        this.$emit('updateSubmitFlag', this.subQuesIndex)
+      }
+    },
+    afterStoreTopic(order, studentAnswer){
+      this.$emit('updateQuestionList', JSON.stringify({ order, studentAnswer }))
+      if (this.storeFlag) {
         uni.showToast({
           title: '暂存成功',
           icon: 'success'
@@ -257,12 +299,13 @@ export default {
 						studentAnswer: this.oldSelectedOpts.toString(),
 						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
+            this.afterStoreTopic(question.order, this.oldSelectedOpts.toString())
+            this.isNeedUpdateSubmitFlag()
             this.oldSelectedOpts = []
-            this.afterStoreTopic()
 					})
 				})
 			} else {
-        this.afterStoreTopic()
+        this.afterStoreTopic(question.order, question.studentAnswer)
       }
     },
     submitBoolAnswer(question) {
@@ -275,13 +318,14 @@ export default {
 						studentAnswer: this.oldBoolStudentAnswer.toString(),
 						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
+            this.afterStoreTopic(question.order, this.oldBoolStudentAnswer.toString())
+            this.isNeedUpdateSubmitFlag()
             this.oldBoolStudentAnswer = null
-            this.afterStoreTopic()
 					})
 				})
 			} else {
         console.log('submitBoolAnswer is null')
-        this.afterStoreTopic()
+        this.afterStoreTopic(question.order, question.studentAnswer)
       }
 		},
     chooseSelectItem(question, index) {
@@ -318,24 +362,36 @@ export default {
         }
 			}
 		},
-    toFillAnswer(index) {
+    toFillAnswer(urls, index) {
 			uni.navigateTo({
-			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${this.question.order}&classId=${this.clsId}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${this.time}`
+			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${this.question.order}&classId=${this.clsId}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${this.time}&urls=${JSON.stringify(urls)}`
 			})
     },
     fmtFillAnswer(question) {
-      if (question.questionType !== QuestionType.FILL_BLANK_QUESTION || question.studentAnswer === null) {
-				return []
-			} else {
-				const answerFmt = question.studentAnswer.replace(/null/gm, '')
-				let answerList = answerFmt.split('##')
-				answerList.map((v, i) => {
-					if (v.substr(-4) === '.png') {
-						answerList[i] = v
-					}
-				})
-				return answerList
-			}
+      if (question === null) {
+        return
+      } else {
+        const answerFmt = question.studentAnswer || ''
+        let answerList = answerFmt.split('##')
+        answerList.map((v, i) => {
+          if (v.substr(-4) === '.png') {
+            answerList[i] = v
+          }
+        })
+        answerList.length = question.quesBody.split('______').length - 1
+        const arrList = new Array(answerList.length).fill('')
+        arrList.forEach((v, i) => {
+          answerList[i] = answerList[i] || v
+        })
+        // answerList = Array.from(answerList)
+        // answerList.forEach((v, i) => {
+        //   console.log(v)
+        //   if (v === undefined) {
+        //     answerList[i] === ''
+        //   }
+        // })
+        return answerList
+      }
     },
     uploadTextAnswer(question) {
       uni.chooseImage({
@@ -353,7 +409,7 @@ export default {
 								studentAnswer: resp,
 								time: this.time,
 							}]).then((res) => {
-								this.$emit('updateQuestionList')
+								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, resp}) )
 							})
 						})
           }).catch((err) => {
@@ -417,7 +473,7 @@ export default {
                 audioText: this.question.audioText,
                 studentAnswer: answerNormalLink
               }]).then((res) => {
-                this.$emit('updateQuestionList')
+                this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink}))
               })
             })
           }

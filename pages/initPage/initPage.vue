@@ -29,13 +29,13 @@ export default {
   methods: {
     submit() {
       console.log(this.account, this.password)
-      if (this.account === '' || this.password === '') {
-        uni.showToast({
-          title: '手机号或密码不能为空',
-          icon: 'none'
-        })
-        return
-      }
+      // if (this.account === '' || this.password === '') {
+      //   uni.showToast({
+      //     title: '手机号或密码不能为空',
+      //     icon: 'none'
+      //   })
+      //   return
+      // }
       clientLogin(this.account, this.password).then((res) => {
         console.log(res)
         const code = res.code

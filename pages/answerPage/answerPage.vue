@@ -13,7 +13,7 @@
 						<text class="time-limit"><text class="cdtime">{{ currentTopicTimeCost }}</text>/{{ fmtSecToMin(currentTopic.timeLimit) }}</text>
 						<text class='currentIndex'>{{ questionList.length > 0 ? currentTopicIndex + 1 : 0 }}/{{ questionList.length }}</text>
 					</view>
-					<text @click="showTopicOverview" class='viewAll'>点击查看总览</text>
+					<text @click="showOrHideTopicOverview" class='viewAll'>点击查看总览</text>
 				</view>
 				<image @click='switchTopic(true)' src='../../static/images/icon_nextTopic.png' class='switcher' />
 			</view>
@@ -34,6 +34,7 @@
 						<topic-body
 							v-for="(ques, index) in currentTopic.subQuestions"
 							:key="index"
+							:subQuesIndex="index"
 							:questionIndex='index'
 							:question='ques'
 							v-on:updateQuestionList='updateQuestionList'
@@ -44,6 +45,8 @@
 							:time='timeLimitList[currentTopicIndex]'
 							:storeFlag='storeFlag'
 							v-on:storedTopic='storedTopic'
+							:submitFlag='submitFlag[index]'
+							v-on:updateSubmitFlag='updateSubmitFlag'
 						/>
 					</view>
 				</view>
@@ -59,6 +62,8 @@
 						:time='timeLimitList[currentTopicIndex]'
 						:storeFlag='storeFlag'
 						v-on:storedTopic='storedTopic'
+						:submitFlag='submitFlag'
+						v-on:updateSubmitFlag='updateSubmitFlag'
 					/>
 				</view>
 			</view>
@@ -111,18 +116,60 @@ export default {
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
 			timer: 0, // 计时器,
-			storeFlag: false,
+			storeFlag: false, // 暂存标识
+			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
 		}
 	},
 	computed: {
 		currentTopic() {
-			return this.questionList.length > 0 ? this.questionList[this.currentTopicIndex] : ''
+			if (this.questionList === null || this.questionList === [] || this.questionList === undefined) {
+				return ''
+			} else {
+				return this.questionList.length > 0 ? this.questionList[this.currentTopicIndex] : ''
+			}
 		},
 		fmtQuestionType() {
 		 	return formatQuestionType(this.currentTopic)
 		},
 		currentTopicTimeCost() {
 			return this.fmtSecToMin(this.timeLimitList[this.currentTopicIndex])
+		}
+	},
+	watch: {
+		currentTopicIndex: {
+			handler(newIndex, oldIndex) {
+				if (this.questionList[newIndex].hasSub) {
+					const subQuestions = this.questionList[newIndex].subQuestions
+					const submitFlag = []
+					subQuestions.forEach((ques, i) => {
+						const type = ques.questionType
+						if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
+							submitFlag.push(-1)
+						}
+					})
+					this.submitFlag = submitFlag
+					if (submitFlag.length === 0) {
+						this.submitFlag = true
+					}
+					console.log('submitFlag', this.submitFlag)
+				} else {
+					this.submitFlag = -1
+					console.log('submitFlag', this.submitFlag)
+				}
+			}
+		},
+		submitFlag: {
+			handler(newFlag, oldFlag) {
+				if (typeof newFlag === 'number' && newFlag === 1) {
+					console.log('watch submitFlag number', newFlag)
+					this.submitTopicAction()
+				}
+				if (typeof newFlag === 'object' && newFlag.findIndex((v) => { return v === 0 || v === -1 }) === -1) {
+					console.log('watch submitFlag object', newFlag)
+					this.submitTopicAction()
+				}
+			},
+			deep: true
 		}
 	},
 	onLoad(options) {
@@ -181,188 +228,63 @@ export default {
     clearInterval(this.timer)
   },
 	methods: {
-		updateQuestionList() {
-			return getQuestions(this.examId, this.userId).then((res) => {
-				console.log('getQuestions', res)
-				this.questionList = res.data
-			})
+		updateQuestionList(params) {
+			console.log('updateQuestionList params', params)
+			if (params) {
+				const data = JSON.parse(params)
+				const questionList = JSON.parse(JSON.stringify(this.questionList))
+				questionList.forEach((ques, i) => {
+					if (ques.hasSub) {
+						const subQuestions = ques.subQuestions
+						subQuestions.forEach((subQues, j, arr) => {
+							if (data.order === subQues.order) {
+								subQuestions[j].studentAnswer = data.studentAnswer
+								this.questionList.splice(i, 1, questionList[i])
+							}
+						})
+					} else {
+						if (data.order === ques.order) {
+							questionList[i].studentAnswer = data.studentAnswer
+							this.questionList.splice(i, 1, questionList[i])
+						}
+					}
+				})
+				// this.questionList = questionList
+				console.log('questionList', questionList)
+			} else {
+				return getQuestions(this.examId, this.userId).then((res) => {
+					console.log('getQuestions', res)
+					this.questionList = res.data
+				})
+			}
 		},
 		// 左右切换题目
 		switchTopic(dir) {
 			let newIndex = this.currentTopicIndex
 			const questionList = this.questionList
 			const questionLength = this.questionList.length
-			if (dir) {
-				newIndex += 1
-			} else {
-				newIndex -= 1
-			}
+			dir ? newIndex += 1 : newIndex -= 1
 			if (newIndex > questionLength - 1 || newIndex < 0) {
 				return
 			} else {
-				const oldQuestion = this.questionList[this.currentTopicIndex]
-				this.submitAnswer(oldQuestion)
 				this.currentTopicIndex = newIndex
 				this.order = questionList[newIndex].order
-				// TODO 更换题目
-				// this.updateExamRecordData(this.state.examRecordDataId, newIndex, 0)
 			}
 		},
-		// 提交答案代理方法
-		submitAnswer(question) {
-			const type = question.questionType
-			if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-				this.submitChoiceAnswer(question)
-			} else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-				this.submitBoolAnswer(question)
-			} else if (type === QuestionType.FILL_BLANK_QUESTION) {
-				return
-			} else if (type === QuestionType.TEXT_ANSWER_QUESTION) {
-				return
-			} else if (type === QuestionType.SPOKEN_ANSWER_QUESTION) {
-				return
-			} else if (type === QuestionType.NESTED_ANSWER_QUESTION) {
-				// TODO
-			}
-		},
-		showTopicOverview() {
+		// 展示或隐藏总览
+		showOrHideTopicOverview() {
 			this.showTopicTab = this.showTopicTab ? false : true
 		},
 		// 选择某一题
 		chooseQuestion(index) {
-			const oldQuestion = this.questionList[this.currentTopicIndex]
-			this.submitAnswer(oldQuestion)
 			this.currentTopicIndex = index
-			this.showTopicOverview()
+			this.showOrHideTopicOverview()
 		},
-		showQuestionOptions(question) {
-			return question.questionType === QuestionType.SINGLE_ANSWER_QUESTION || question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION ? true : false
-		},
-		selectedItem(index) {
-			const type = this.currentTopic.questionType
-			const answer = this.currentTopic.studentAnswer
-			if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-				if (this.selectedOptions.length > 0) {
-					return this.selectedOptions.includes(index) ? true : false
-				} else if (answer === null || answer === '') {
-					return false
-				} else {
-					const list = Array.from(answer.replace(/,/g, ''), (v) => { return parseInt(v)})
-					this.selectedOptions = list
-					return list.includes(index) ? true : false
-				}
-			}
-		},
-		chooseSelectItem(question, index) {
-			if (this.selectedOptions.length === 0) {
-				this.selectedOptions.push(index)
-			} else if (question.questionType === QuestionType.SINGLE_ANSWER_QUESTION) {
-				this.selectedOptions = [index]
-			} else if (question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-				const i = this.selectedOptions.findIndex((v) => v === index)
-				if (i !== -1) {
-          this.selectedOptions.splice(i, 1)
-        } else {
-          this.selectedOptions.push(index)
-        }
-			}
-		},
-		selectBoolAnswer(bool, question) {
-			this.boolStudentAnswer = bool
-		},
-		trueOrFalse(question) {
-			if (this.boolStudentAnswer !== null) {
-				return this.boolStudentAnswer
-			} else if (question.questionType === QuestionType.BOOL_ANSWER_QUESTION) {
-				if (question.studentAnswer === 'true') {
-					return true
-				} else if (question.studentAnswer === 'false') {
-					return false
-				}
-			}
-		},
-		fmtFillAnswer(question) {
-			if (question.questionType !== QuestionType.FILL_BLANK_QUESTION || question.studentAnswer === null) {
-				return []
-			} else {
-				const answerFmt = question.studentAnswer.replace(/null/gm, '')
-				let answerList = answerFmt.split('##')
-				answerList.map((v, i) => {
-					if (v.substr(-4) === '.png') {
-						answerList[i] = v
-					}
-				})
-				return answerList
-			}
-		},
+		// 对富文本中的图片进行处理
 		fmtRichTextImg(nodes) {
 			return formatRichTextImg(nodes)
 		},
-		combineUrl(url) {
-			return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
-		},
-		toFillAnswer(question, index) {
-			const time = this.timeLimitList[this.currentTopicIndex]
-			uni.navigateTo({
-			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${question.order}&classId=${this.clsId}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${time}`
-			})
-		},
-		submitBoolAnswer(question) {
-			if (this.boolStudentAnswer !== null) {
-				currentServerTime().then(time => {
-					examSubmit(this.examId, this.userId, time, [{ // 这里学生id要用userId ...
-						order: question.order,
-						studentAnswer: this.boolStudentAnswer.toString(),
-						time: this.timeLimitList[this.currentTopicIndex],
-					}]).then((res) => {
-						this.boolStudentAnswer = null
-						this.updateQuestionList()
-					})
-				})
-			}
-		},
-		submitChoiceAnswer(question) {
-			if (this.selectedOptions.length > 0) {
-				currentServerTime().then(time => {
-					examSubmit(this.examId, this.userId, time, [{
-						order: question.order,
-						studentAnswer: this.selectedOptions.toString(),
-						time: this.timeLimitList[this.currentTopicIndex],
-					}]).then((res) => {
-						this.selectedOptions = []
-						this.updateQuestionList()
-					})
-				})
-			}
-		},
-		uploadTextAnswer(question) {
-			uni.chooseImage({
-			  count: 1,
-        sizeType: ['compressed'],
-			}).then((res) => {
-        if (res[0] === null) {
-					const filePath = res[1].tempFilePaths[0]
-					console.log(res, this.clsId, this.examId, filePath)
-          uploadImageToAliOss(this.clsId, this.examId, filePath).then((resp) => {
-						console.log('uploadImageToAliOss', resp, question)
-						currentServerTime().then(time => {
-							console.log(time)
-							examSubmit(this.examId, this.userId, time, [{
-								order: question.order,
-								studentAnswer: resp,
-								time: this.timeLimitList[this.currentTopicIndex],
-							}]).then((res) => {
-								this.updateQuestionList()
-							})
-						})
-          }).catch((err) => {
-						console.log('uploadImageToAliOss error', err)
-					})
-        } else {
-          throw new Error(res[0])
-        }
-      })
-		},
+		// 倒计时
 		fmtSecToMin(time) {
 			if (this.timeLimitList.length > 0) {
 				const fmtTime = formatSecondToMinSecond(time)
@@ -378,17 +300,39 @@ export default {
       this.storeFlag = true
     },
 		submitTopic() {
-			uni.showModal({
-			  title: '提示',
-        content: '上交后将无法继续作答，如需继续作答，请切换至下一题',
-        success(res) {
-          if (res.confirm) {
-            this.storeTopic()
-            endExam(this.examId, this.studentId).then((res) => {
-              console.log('endExam', res)
-            })
-          }
-        }
+			if (this.submitFlag === -1) {
+				this.submitFlag = 0
+			} else if (typeof this.submitFlag === 'object') {
+				this.submitFlag = new Array(this.submitFlag.length).fill(0)
+			} else if (submitFlag === true) {
+				this.submitTopicAction()
+			}
+		},
+		submitedTopic() {
+			this.submitFlag = false
+		},
+		updateSubmitFlag(data) {
+			console.log('updateSubmitFlag', data, this.submitFlag)
+			if (data !== undefined) {
+				this.submitFlag.splice(data, 1, 1)
+			} else if (this.submitFlag === 0) {
+				this.submitFlag = 1
+			} else if (this.submitFlag === true) {
+				return
+			}
+		},
+		submitTopicAction() {
+			endExam(this.examId, this.userId).then((res) => {
+				console.log('endExam', res)
+				uni.showModal({
+					title: '提示',
+					content: '提交成功',
+				})
+				if (typeof this.submitFlag === 'number') {
+					this.submitFlag = -1
+				} else {
+					this.submitFlag = new Array(this.submitFlag.length).fill(-1)
+				}
 			})
 		}
 	}

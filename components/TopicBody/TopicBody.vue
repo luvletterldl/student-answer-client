@@ -3,13 +3,13 @@
     <view class="ques-top-body">
       <text class="ques-type">{{ fmtQuestionType }}</text>
       <text class="quest-index">{{ questionIndex + 1 }}、</text>
-      <rich-text class="questBody" :nodes="question.quesBody" />
+      <rich-text class="questBody" :nodes="fmtRichTextImg(question.quesBody)" />
       <custom-audio v-if="question.audioLink !== null" :audioSrc="question.audioLink" />
     </view>
     <view v-if="question.questionType === QuestionType.SINGLE_ANSWER_QUESTION || question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION" class="options">
       <view @click="chooseSelectItem(question, index)" v-for="(option, index) in question.quesOptions" :key="index" class="option">
         <view class="option-index" :class="selectedOptions.includes(index) ? 'selected-option' : ''">{{ ChoiceOption[index] }}</view>
-        <rich-text :nodes="option.optionBody" />
+        <rich-text :nodes="fmtRichTextImg(option.optionBody)" />
       </view>
     </view>
     <view v-if="question.questionType === QuestionType.BOOL_ANSWER_QUESTION" class="true-false">
@@ -43,7 +43,7 @@
         </view>
         <view class="evoluation">
           <text>口语评价: {{ evaluationAccuracy }}分</text>
-          <rich-text class="words" :nodes="evaluationResult" />
+          <rich-text class="words" :nodes="fmtRichTextImg(evaluationResult)" />
         </view>
       </view>
     </view>
@@ -55,7 +55,7 @@ import Main from '../../lib/Main'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
 import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss } from '../../lib/Api'
-import { formatQuestionType } from '../../lib/Utils';
+import { formatQuestionType, formatRichTextImg } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
 export default {
@@ -92,6 +92,14 @@ export default {
     time: {
       type: Number,
       reuqired: true,
+    },
+    storeFlag: {
+      type: Boolean,
+      reuqired: true,
+    },
+    storedTopic: {
+      type: Function,
+      reuqired: true
     }
   },
   components: {
@@ -125,7 +133,7 @@ export default {
           }
         }
         if (newQues) {
-           console.log('newQues', newQues, 'newQues.questionType', newQues.questionType)
+          console.log('newQues', newQues, 'newQues.questionType', newQues.questionType)
           const type = newQues.questionType
           const answer = newQues.studentAnswer
           if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
@@ -148,17 +156,13 @@ export default {
         this.oldTime = oldTime
       }
     },
-    // boolStudentAnswer: {
-    //   handler(newBoolStudentAnswer, oldBoolStudentAnswer) {
-    //     this.oldBoolStudentAnswer = newBoolStudentAnswer
-    //   }
-    // },
-    // selectedOptions: {
-    //   handler(newSelectedOpts, oldSelectedOpts) {
-    //     this.oldSelectedOpts = newSelectedOpts
-    //   },
-    //   deep: true
-    // }
+    storeFlag: {
+      handler(newFlag, oldFlag) {
+        if (newFlag === true) {
+          this.submitTopicWhenBoolOrChoice()
+        }
+      }
+    }
   },
   computed: {
     fmtQuestionType() {
@@ -209,54 +213,76 @@ export default {
     this.rm.onInterruptionEnd((e) => this.onInterruptionEnd(e))
     this.rm.onError((e) => this.onError(e))
   },
-  beforeUpdate() {
-    console.log('beforeUpdate', this.question, this.question.questionType)
-  },
-  updated() {
-    console.log('updated', this.question, this.question.questionType)
-  },
+  // beforeUpdate() {
+  //   console.log('beforeUpdate', this.question, this.question.questionType)
+  // },
+  // updated() {
+  //   console.log('updated', this.question, this.question.questionType)
+  // },
   beforeDestroy() {
     console.log('beforeDestroy', this.question, this.question.questionType, this.oldBoolStudentAnswer, this.oldSelectedOpts)
-    const type = this.question.questionType
-    if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-      this.submitChoiceAnswer(this.question)
-    } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-      this.submitBoolAnswer(this.question)
-    }
+    this.submitTopicWhenBoolOrChoice()
   },
   methods: {
+    fmtRichTextImg(nodes) {
+			return formatRichTextImg(nodes)
+		},
     combineUrl(url) {
       return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
+    },
+    afterStoreTopic(){
+      this.$emit('updateQuestionList')
+      if (this.storeFlag === true) {
+        uni.showToast({
+          title: '暂存成功',
+          icon: 'success'
+        })
+        this.$emit('storedTopic')
+      }
+    },
+    submitTopicWhenBoolOrChoice(){
+      const type = this.question.questionType
+      if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+        this.submitChoiceAnswer(this.question)
+      } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+        this.submitBoolAnswer(this.question)
+      }
     },
     submitChoiceAnswer(question) {
 			if (this.oldSelectedOpts.length > 0) {
         console.log(this.selectedOptions, this.oldSelectedOpts)
-				return currentServerTime().then(serverTime => {
-					return examSubmit(this.examId, this.studentId, serverTime, [{
+				currentServerTime().then(serverTime => {
+          examSubmit(this.examId, this.userId, serverTime, [{
 						order: question.order,
 						studentAnswer: this.oldSelectedOpts.toString(),
-						time: this.oldTime,
+						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
             this.oldSelectedOpts = []
-						this.$emit('updateQuestionList')
+            this.afterStoreTopic()
 					})
 				})
-			}
+			} else {
+        this.afterStoreTopic()
+      }
     },
     submitBoolAnswer(question) {
+      console.log(this.boolStudentAnswer, this.oldBoolStudentAnswer)
 			if (this.oldBoolStudentAnswer !== null) {
-        console.log(this.boolStudentAnswer, this.oldBoolStudentAnswer)
+        console.log('submitBoolAnswer !== null')
 				currentServerTime().then(serverTime => {
-					examSubmit(this.examId, this.studentId, serverTime, [{
+					examSubmit(this.examId, this.userId, serverTime, [{
 						order: question.order,
 						studentAnswer: this.oldBoolStudentAnswer.toString(),
-						time: this.oldTime,
+						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
             this.oldBoolStudentAnswer = null
-						this.$emit('updateQuestionList')
+            this.afterStoreTopic()
 					})
 				})
-			}
+			} else {
+        console.log('submitBoolAnswer is null')
+        this.afterStoreTopic()
+      }
 		},
     chooseSelectItem(question, index) {
 			if (this.selectedOptions.length === 0) {
@@ -322,7 +348,7 @@ export default {
           uploadImageToAliOss(this.clsId, this.examId, filePath).then((resp) => {
 						console.log('uploadImageToAliOss', resp, question)
 						currentServerTime().then(serverTime => {
-							examSubmit(this.examId, this.studentId, serverTime, [{
+							examSubmit(this.examId, this.userId, serverTime, [{ // 这里学生id要用userId ...
 								order: question.order,
 								studentAnswer: resp,
 								time: this.time,
@@ -384,7 +410,7 @@ export default {
             this.spokenResult = resp.data.evaluation
             uni.hideLoading()
             currentServerTime().then((time) => {
-              examSubmit(this.examId, this.studentId, time, [{
+              examSubmit(this.examId, this.userId, time, [{
                 order: this.question.order,
                 time: this.time,
                 mediaId: data.data.id,
@@ -500,6 +526,12 @@ export default {
     .upToError {
       background:linear-gradient(180deg,rgba(255,143,140,1) 0%,rgba(255,111,119,1) 100%);
     }
+  }
+  .default-view {
+    text-align: center;
+    padding: 10vw 0;
+    border-radius: 8px;
+    background: $default-bgcolor;
   }
   .recorder-panel {
     display: flex;

@@ -119,7 +119,7 @@ export default {
 						}
 					})
 					currentServerTime().then(serverTime => {
-						examSubmit(this.examId, this.studentId, serverTime, [{
+						examSubmit(this.examId, this.userId, serverTime, [{
 							order: this.order,
 							studentAnswer: studentAnswerList.toString().replace(/,/g, ''),
 							time: this.time,

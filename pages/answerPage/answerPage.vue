@@ -29,7 +29,7 @@
 					<view class="ques-top-body">
 						<text class="ques-type">{{ fmtQuestionType }}</text>
 						<text class="quest-index">{{ currentTopicIndex + 1 }}、</text>
-						<view class="questBody" v-html="currentTopic.quesBody"></view>
+						<rich-text class="questBody" :nodes="fmtRichTextImg(currentTopic.quesBody)" />
 						<custom-audio v-if="currentTopic.audioLink !== null" :audioSrc="currentTopic.audioLink" />
 						<topic-body
 							v-for="(ques, index) in currentTopic.subQuestions"
@@ -41,7 +41,9 @@
 							:examId='examId'
 							:examRecordId='examRecordId'
 							:studentId='studentId'
-							:time='questionList[currentTopicIndex]'
+							:time='timeLimitList[currentTopicIndex]'
+							:storeFlag='storeFlag'
+							v-on:storedTopic='storedTopic'
 						/>
 					</view>
 				</view>
@@ -54,7 +56,9 @@
 						:examId='examId'
 						:examRecordId='examRecordId'
 						:studentId='studentId'
-						:time='questionList[currentTopicIndex]'
+						:time='timeLimitList[currentTopicIndex]'
+						:storeFlag='storeFlag'
+						v-on:storedTopic='storedTopic'
 					/>
 				</view>
 			</view>
@@ -72,9 +76,9 @@ import CustomAudio from '../../components/CustomAudio/CustomAudio';
 import RecorderPanel from '../../components/RecorderPanel/RecorderPanel'
 import TopicBody from '../../components/TopicBody/TopicBody'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
-import { formatQuestionType, formatSecondToMinSecond } from '../../lib/Utils';
+import { formatQuestionType, formatSecondToMinSecond, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam } from '../../lib/Api'
 export default {
 	components: {
 		ClassTopBaseInfo,
@@ -106,7 +110,8 @@ export default {
 			selectedOptions: [], // 选择题选中的索引列表
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
-			timer: 0, // 计时器
+			timer: 0, // 计时器,
+			storeFlag: false,
 		}
 	},
 	computed: {
@@ -290,6 +295,9 @@ export default {
 				return answerList
 			}
 		},
+		fmtRichTextImg(nodes) {
+			return formatRichTextImg(nodes)
+		},
 		combineUrl(url) {
 			return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
 		},
@@ -302,7 +310,7 @@ export default {
 		submitBoolAnswer(question) {
 			if (this.boolStudentAnswer !== null) {
 				currentServerTime().then(time => {
-					examSubmit(this.examId, this.studentId, time, [{
+					examSubmit(this.examId, this.userId, time, [{ // 这里学生id要用userId ...
 						order: question.order,
 						studentAnswer: this.boolStudentAnswer.toString(),
 						time: this.timeLimitList[this.currentTopicIndex],
@@ -316,7 +324,7 @@ export default {
 		submitChoiceAnswer(question) {
 			if (this.selectedOptions.length > 0) {
 				currentServerTime().then(time => {
-					examSubmit(this.examId, this.studentId, time, [{
+					examSubmit(this.examId, this.userId, time, [{
 						order: question.order,
 						studentAnswer: this.selectedOptions.toString(),
 						time: this.timeLimitList[this.currentTopicIndex],
@@ -339,7 +347,7 @@ export default {
 						console.log('uploadImageToAliOss', resp, question)
 						currentServerTime().then(time => {
 							console.log(time)
-							examSubmit(this.examId, this.studentId, time, [{
+							examSubmit(this.examId, this.userId, time, [{
 								order: question.order,
 								studentAnswer: resp,
 								time: this.timeLimitList[this.currentTopicIndex],
@@ -362,6 +370,26 @@ export default {
 			} else {
 				return '0:0'
 			}
+		},
+		storedTopic() {
+			this.storeFlag = false
+		},
+    storeTopic() {
+      this.storeFlag = true
+    },
+		submitTopic() {
+			uni.showModal({
+			  title: '提示',
+        content: '上交后将无法继续作答，如需继续作答，请切换至下一题',
+        success(res) {
+          if (res.confirm) {
+            this.storeTopic()
+            endExam(this.examId, this.studentId).then((res) => {
+              console.log('endExam', res)
+            })
+          }
+        }
+			})
 		}
 	}
 }
@@ -378,10 +406,15 @@ export default {
     margin: 2vw 5vw;
     padding: 3vw 5vw;
     align-items: center;
-    justify-content: space-between;
+		justify-content: space-between;
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		box-shadow: 0px 0px 10px 0px #dce4f6;
     .switcher {
       width: 8vw;
-      height: 8vw;
+			height: 8vw;
+			flex-shrink: 0;
     }
     .topicProcess {
       font-size: 4vw;
@@ -427,6 +460,9 @@ export default {
 		display: flex;
 		flex-flow: column;
 		text-align: center;
+		position: sticky;
+		top: 17vw;
+		z-index: 2;
 		.topic-index {
 			display: flex;
 			flex-wrap: wrap;
@@ -458,6 +494,7 @@ export default {
 		}
 	}
 	.topic-list {
+		box-shadow: 0px 0px 10px 0px rgba(220,228,246,1);
 		width: 90vw;
 		margin: 2vw 5vw 15vh 5vw;
 		background: #FFF;

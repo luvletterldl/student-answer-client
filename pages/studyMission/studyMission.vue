@@ -33,14 +33,6 @@
 import ActionSheet from '../../components/ActionSheet/ActionSheet.vue'
 import { getCourseInfoByStudentId, getMyClassLesson } from '../../lib/Api'
 import Main from '../../lib/Main'
-let studentId = 0
-let userId = 0
-const studentInfo = uni.getStorageSync(Main.studentInfo)
-const userInfo = uni.getStorageSync(Main.userInfo)
-if (studentInfo !== '' && userInfo !== '') {
-  studentId = JSON.parse(studentInfo).id
-  userId = JSON.parse(userInfo).userId
-}
 export default {
   components: {
     ActionSheet,
@@ -50,34 +42,40 @@ export default {
       courseInfoList: [],
       courseList: [],
       selectedIndex: 0,
-      actionSheetStatus: false
+      actionSheetStatus: false,
+      studentId: 0,
+      userId: 0,
     };
   },
   computed: {
     selectedCourse() {
-      return this.courseInfoList[this.selectedIndex]
+      if (this.courseInfoList.length > 0) {
+        return this.courseInfoList[this.selectedIndex]
+      } else {
+        return undefined
+      }
     }
   },
   watch: {
     selectedIndex: {
       handler(newIndex, oldIndex) {
-        if (this.courseInfoList.length === 0) {
-          this.initCourseInfo().then(() => { this.getClassLessonInfo() })
-        } else {
-          this.getClassLessonInfo()
-        }
+        this.getClassLessonInfo()
       },
-      immediate: true
     }
+  },
+  onLoad(options) {
+    this.studentId = Number(options.studentId)
+    this.userId = Number(options.userId)
+    this.initCourseInfo().then(() => { this.getClassLessonInfo() })
   },
   methods: {
     initCourseInfo() {
-      return getCourseInfoByStudentId(studentId).then((res) => {
+      return getCourseInfoByStudentId(this.studentId).then((res) => {
         this.courseInfoList = res.data
       })
     },
     getClassLessonInfo() {
-      getMyClassLesson(studentId, 0, this.selectedCourse.courseId).then((res) => {
+      getMyClassLesson(this.studentId, 0, this.selectedCourse.courseId).then((res) => {
         this.courseList = res.data
       })
     },
@@ -95,7 +93,7 @@ export default {
     },
     toCourseDetail(_, index) {
       uni.navigateTo({
-        url: `/pages/singleLessonMisson/singleLessonMisson?studentId=${studentId}&courseId=${this.selectedCourse.courseId}&index=${index}`
+        url: `/pages/singleLessonMisson/singleLessonMisson?studentId=${this.studentId}&courseId=${this.selectedCourse.courseId}&index=${index}`
       })
     }
   }
@@ -125,16 +123,16 @@ export default {
     }
   }
   .actionSheet {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100vw;
-    padding: 3vw 5vw;
-    max-height: 65vh;
-    overflow: scroll;
-    display: flex;
-    flex-flow: column nowrap;
-    align-items: center;
+    // position: fixed;
+    // bottom: 0;
+    // left: 0;
+    // width: 100vw;
+    // padding: 3vw 5vw;
+    // /* height: 100vh; */
+    // overflow: scroll;
+    // display: flex;
+    // flex-flow: column nowrap;
+    // align-items: center;
     .courseName {
       padding: 3vw 5vw;
       border-radius: 5vw;

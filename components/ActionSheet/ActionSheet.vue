@@ -39,9 +39,15 @@ export default {
   width: 100vw;
   height: 100vh;
   position: fixed;
-  top: 0;
+  overflow: scroll;
+  bottom: 0;
   left: 0;
   z-index: 10;
+  display: flex;
+  flex-flow: column nowrap;
+  align-items: center;
+  // padding: 3vw 5vw;
+  box-sizing: content-box;
   .action-sheet-mask {
     background: rgba(0,0,0,.4);
     width: 100vw;

@@ -82,5 +82,5 @@ $default-bgcolor: #F3F6FC;
   width: 100vw;
   min-height: 100vh;
   background: $default-bgcolor;
-  overflow: hidden;
+  position: absolute;
 }

@@ -2,8 +2,8 @@
 	<view class="container">
     <view class="content">
       <text>欢迎登录</text>
-      <input placeholder="请输入账号" v-model="account" type="text" />
-      <input placeholder="请输入密码" v-model="password" type="password" />
+      <input class='text' placeholder="请输入账号" v-model.trim="account" type="text" />
+      <input class='password' placeholder="请输入密码" v-model.trim="password" type="password" />
       <button @click="submit">登录</button>
     </view>
 	</view>
@@ -29,7 +29,27 @@ export default {
   methods: {
     submit() {
       console.log(this.account, this.password)
-      clientLogin().then((res) => {
+      if (this.account === '' || this.password === '') {
+        uni.showToast({
+          title: '手机号或密码不能为空',
+          icon: 'none'
+        })
+        return
+      }
+      clientLogin(this.account, this.password).then((res) => {
+        console.log(res)
+        const code = res.code
+        let title = ''
+        if (code === 'K-000012' || code === 'K-000011') {
+          title = res.desc
+        }
+        if (title !== '') {
+          uni.showToast({
+            title: title,
+            icon: 'none'
+          })
+          return
+        }
         const { student, user } = res
         if (student && user) {
           student.ecOrgId = student.ecOrgId ? student.ecOrgId : 110
@@ -37,7 +57,7 @@ export default {
           uni.setStorageSync(Main.userInfo, JSON.stringify(user))
           uni.setStorageSync(Main.studentInfo, JSON.stringify(student))
           uni.navigateTo({
-            url: '/pages/studyMission/studyMission',
+            url: `/pages/studyMission/studyMission?studentId=${student.id}&userId=${user.userId}`,
             success: (res) => {
               console.log('succ', res)
             },
@@ -46,6 +66,8 @@ export default {
             }
           })
         }
+      }).catch((err) => {
+        console.log('client login Err', err)
       })
     }
   }
@@ -66,10 +88,8 @@ export default {
     width: 80vw;
     padding: 5vw;
     margin: 30vh 10vw;
-    u-input {
-      .u-input {
-        margin: 5vw 0;
-      }
+    .text, .password {
+      margin: 5vw 0;
     }
   }
 }

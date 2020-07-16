@@ -86,11 +86,15 @@ export default {
       type: Number,
       reuqired: true,
     },
-    examRecordId: {
+    examRecordDataId: {
       type: Number,
       reuqired: true,
     },
     studentId: {
+      type: Number,
+      reuqired: true,
+    },
+    userId: {
       type: Number,
       reuqired: true,
     },
@@ -122,7 +126,7 @@ export default {
     return {
       QuestionType: QuestionType,
       ChoiceOption: ChoiceOption,
-      userId: 0,
+      // userId: 0,
       selectedOptions: [],
       boolStudentAnswer: null,
       oldBoolStudentAnswer: null,
@@ -171,25 +175,25 @@ export default {
         this.oldTime = oldTime
       }
     },
-    storeFlag: {
-      handler(newFlag, oldFlag) {
-        if (newFlag === true) {
-          const type = this.question.questionType
-          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-              this.submitChoiceAnswer(this.question)
-            } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-              this.submitBoolAnswer(this.question)
-            }
-          if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
-            uni.showToast({
-              title: '暂存成功',
-              icon: 'success'
-            })
-            this.$emit('storedTopic')
-          }
-        }
-      }
-    },
+    // storeFlag: {
+    //   handler(newFlag, oldFlag) {
+    //     if (newFlag === true) {
+    //       const type = this.question.questionType
+    //       if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+    //           this.submitChoiceAnswer(this.question)
+    //         } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+    //           this.submitBoolAnswer(this.question)
+    //         }
+    //       if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
+    //         uni.showToast({
+    //           title: '暂存成功',
+    //           icon: 'success'
+    //         })
+    //         this.$emit('storedTopic')
+    //       }
+    //     }
+    //   }
+    // },
     submitFlag: {
       handler(newFlag, oldFlag) {
         if (newFlag === 0) {
@@ -235,10 +239,10 @@ export default {
     }
   },
   mounted() {
-		if (uni.getStorageSync(Main.userInfo) !== '') {
-			const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
-			this.userId = userInfo.userId
-    }   
+		// if (uni.getStorageSync(Main.userInfo) !== '') {
+		// 	const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
+		// 	this.userId = userInfo.userId
+    // }   
     if (this.rm === undefined) {
       this.rm = uni.getRecorderManager()
     }
@@ -275,12 +279,9 @@ export default {
     afterStoreTopic(order, studentAnswer){
       this.$emit('updateQuestionList', JSON.stringify({ order, studentAnswer }))
       if (this.storeFlag) {
-        uni.showToast({
-          title: '暂存成功',
-          icon: 'success'
-        })
         this.$emit('storedTopic')
       }
+      this.isNeedUpdateSubmitFlag()
     },
     submitTopicWhenBoolOrChoice(){
       const type = this.question.questionType
@@ -300,7 +301,6 @@ export default {
 						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
             this.afterStoreTopic(question.order, this.oldSelectedOpts.toString())
-            this.isNeedUpdateSubmitFlag()
             this.oldSelectedOpts = []
 					})
 				})
@@ -319,7 +319,6 @@ export default {
 						time: this.storeFlag === true ? this.time : this.oldTime,
 					}]).then((res) => {
             this.afterStoreTopic(question.order, this.oldBoolStudentAnswer.toString())
-            this.isNeedUpdateSubmitFlag()
             this.oldBoolStudentAnswer = null
 					})
 				})
@@ -409,7 +408,7 @@ export default {
 								studentAnswer: resp,
 								time: this.time,
 							}]).then((res) => {
-								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, resp}) )
+								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, studentAnswer: resp}) )
 							})
 						})
           }).catch((err) => {
@@ -447,7 +446,7 @@ export default {
       uni.showLoading({
         title: '录音上传中...'
       })
-      uploadMp3ToAliOss(this.examRecordId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
+      uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
         const data = JSON.parse(res)
         uni.hideLoading()
         uni.showLoading({
@@ -588,6 +587,9 @@ export default {
     padding: 10vw 0;
     border-radius: 8px;
     background: $default-bgcolor;
+  }
+  .text-answer {
+    text-align: center;
   }
   .recorder-panel {
     display: flex;

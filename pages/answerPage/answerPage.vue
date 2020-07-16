@@ -40,7 +40,7 @@
 							v-on:updateQuestionList='updateQuestionList'
 							:clsId='clsId'
 							:examId='examId'
-							:examRecordId='examRecordId'
+							:examRecordDataId='examRecordDataId'
 							:studentId='studentId'
 							:time='timeLimitList[currentTopicIndex]'
 							:storeFlag='storeFlag'
@@ -57,7 +57,7 @@
 						v-on:updateQuestionList='updateQuestionList'
 						:clsId='clsId'
 						:examId='examId'
-						:examRecordId='examRecordId'
+						:examRecordDataId='examRecordDataId'
 						:studentId='studentId'
 						:time='timeLimitList[currentTopicIndex]'
 						:storeFlag='storeFlag'
@@ -72,6 +72,10 @@
 				<button @click="storeTopic" class="store-submit">暂存</button>
 			</view>
 		</view>
+		<default-answer-page-view v-if="showDefaultView" />
+		<view v-if="showExitBtn" class="exit">
+			<navigator class="exitBtn" open-type="exit" target="miniProgram">退出答题</navigator>
+		</view>
 	</view>
 </template>
 
@@ -80,33 +84,37 @@ import ClassTopBaseInfo from '../../components/ClassTopBaseInfo/ClassTopBaseInfo
 import CustomAudio from '../../components/CustomAudio/CustomAudio';
 import RecorderPanel from '../../components/RecorderPanel/RecorderPanel'
 import TopicBody from '../../components/TopicBody/TopicBody'
+import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { formatQuestionType, formatSecondToMinSecond, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam, header } from '../../lib/Api'
 export default {
 	components: {
 		ClassTopBaseInfo,
 		CustomAudio,
 		RecorderPanel,
 		TopicBody,
+		DefaultAnswerPageView,
 	},
 	data() {
 		return {
+			showDefaultView: true, // 占位组件
+			showExitBtn: false, // 答题完毕后退出小程序
 			userId: 0,
 			clsId: 0,
 			courseId: 0,
 			lessonId: 0,
 			id: 0,
 			studentId: 0,
-			examRecordId: 0,
+			examRecordDataId: 0,
 			examId: 0,
 			className: '',
 			courseName: '',
 			currentLessonNumber: '',
 			showAnswerPanel: false, // 展示答题面板
 			showTopicTab: false, // 展示题目Tab
-			order: 0, // 题目order
+			// order: 0, // 题目order
 			assignmentInfo: {}, 
 			questionList: [], // 题目列表
 			currentTopicIndex: 0, // 当前题目索引
@@ -138,23 +146,25 @@ export default {
 	watch: {
 		currentTopicIndex: {
 			handler(newIndex, oldIndex) {
-				if (this.questionList[newIndex].hasSub) {
-					const subQuestions = this.questionList[newIndex].subQuestions
-					const submitFlag = []
-					subQuestions.forEach((ques, i) => {
-						const type = ques.questionType
-						if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
-							submitFlag.push(-1)
+				if (this.questionList.length > 0) {
+					if (this.questionList[newIndex].hasSub) {
+						const subQuestions = this.questionList[newIndex].subQuestions
+						const submitFlag = []
+						subQuestions.forEach((ques, i) => {
+							const type = ques.questionType
+							if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
+								submitFlag.push(-1)
+							}
+						})
+						this.submitFlag = submitFlag
+						if (submitFlag.length === 0) {
+							this.submitFlag = true
 						}
-					})
-					this.submitFlag = submitFlag
-					if (submitFlag.length === 0) {
-						this.submitFlag = true
+						console.log('submitFlag', this.submitFlag)
+					} else {
+						this.submitFlag = -1
+						console.log('submitFlag', this.submitFlag)
 					}
-					console.log('submitFlag', this.submitFlag)
-				} else {
-					this.submitFlag = -1
-					console.log('submitFlag', this.submitFlag)
 				}
 			}
 		},
@@ -175,37 +185,68 @@ export default {
 	onLoad(options) {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		const {clsId, courseId, lessonId, id, studentId, ecExamRecordId} = JSON.parse(options.data)
-		if (uni.getStorageSync(Main.userInfo) !== '') {
-			const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
-			this.userId = userInfo.userId
+		const url = 'https://test.xiaocongkj.com/?token=3bb13db90c584438a0facf99c8e46d19&key=U_E_17_11938&userId=11938&studentId=11969&examId=2512&examRecordDataId=2543&mainNum=5&className=0702口语班&courseName=0702教研课程&currentLessonNumber=第1课次&clsId=5027'
+		// const url = decodeURIComponent(options.q)
+		const q = decodeURIComponent(url)
+		console.log('options', q)
+		const getParams = (url) => {
+			if (url === undefined) {
+				return ''
+			} else if (url !== '') {
+				console.log('url', url)
+				let paramsList = url.split('?')[1]
+				Main.host = url.split('?')[0]
+				if (paramsList) {
+					paramsList = paramsList.split('&')
+				} else {
+					throw new Error(`没有合适的传参: url: ${url}, options.q: ${options.q}`)
+					return
+				}
+				let params = {}
+				paramsList.forEach((v, i) => {
+					params[v.split('=')[0]] = v.split('=')[1]
+				})
+				return params
+			} else {
+				return ''
+			}
 		}
-		this.clsId = clsId
-		this.courseId = courseId
-		this.lessonId = lessonId
-		this.id = id
-		this.studentId = studentId
-		this.examRecordId = ecExamRecordId
-		this.showAnswerPanel = true
-		console.log(JSON.parse(options.data))
-		findClsAndCourseByClassIdAndCourseId(clsId, courseId, 4, id).then((res) => {
-			console.log('res', res)
-			const { className, courseName, currentLessonNumber } = res
+		let p = undefined
+		if (q !== undefined && q !== '' && q !== null) {
+		 	p = getParams(q)
+		} else {
+			return false
+		}
+		if (
+			'token' in p &&
+			'key' in p &&
+			'mainNum' in p &&
+			'className' in p &&
+			'courseName' in p &&
+			'currentLessonNumber' in p &&
+			'clsId' in p &&
+			'examId' in p &&
+			'examRecordDataId' in p &&
+			'studentId' in p &&
+			'userId' in p
+		) {
+			this.showDefaultView = false
+			const {token, key, mainNum, className, courseName, currentLessonNumber, clsId, examId, examRecordDataId, studentId, userId} = p
+			// this.token = token
+			// this.key = key
+			// this.mainNum = Number(mainNum)
+			this.currentTopicIndex = Number(mainNum) - 1
 			this.className = className
 			this.courseName = courseName
 			this.currentLessonNumber = currentLessonNumber
-		})
-		pageAssignment(this.clsId, this.lessonId, '待完成', this.studentId, 0, 5).then((res) => {
-			console.log('pageAssignment', res)
-			this.assignmentInfo = res.list[0]
-			console.log(this.assignmentInfo)
-			const courseId = this.assignmentInfo.courseId;
-			const classId = this.assignmentInfo.classId;
-			const examId = this.assignmentInfo.ecExamId;
-			this.examId = examId
-			const id = this.assignmentInfo.id;
-			const ecExamRecordId = this.assignmentInfo.ecExamRecordId;
-			startExam(examId, this.userId).then(() => {
+			this.clsId = Number(clsId)
+			this.examId = Number(examId)
+			this.examRecordDataId = Number(examRecordDataId)
+			this.studentId = Number(studentId)
+			this.userId = Number(userId)
+			header.key = key
+			header.token = token
+			startExam(this.examId, this.userId).then(() => {
 				this.updateQuestionList().then(() => {
 					this.timeLimitList = new Array(this.questionList.length).fill(0)
 					this.timer = setInterval(() => {
@@ -213,11 +254,53 @@ export default {
 						this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
 					}, 1000)
 				})
-				// findExamQuestionList(examId, this.userId).then((res) => {
-				// 	console.log('findExamQuestionList', res)
-				// })
 			})
-		})
+		} else {
+			this.showDefaultView = true
+		}
+		// if (uni.getStorageSync(Main.userInfo) !== '') {
+		// 	const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
+		// 	this.userId = userInfo.userId
+		// }
+		// const mainNum = Number(options.mainNum)
+		// this.clsId = clsId
+		// this.courseId = courseId
+		// this.lessonId = lessonId
+		// this.id = id
+		// this.studentId = studentId
+		// this.examRecordDataId = ecExamRecordId
+		// this.showAnswerPanel = true
+		// console.log(JSON.parse(options.data))
+		// findClsAndCourseByClassIdAndCourseId(clsId, courseId, 4, id).then((res) => {
+		// 	console.log('res', res)
+		// 	const { className, courseName, currentLessonNumber } = res
+		// 	this.className = className
+		// 	this.courseName = courseName
+		// 	this.currentLessonNumber = currentLessonNumber
+		// })
+		// pageAssignment(this.clsId, this.lessonId, '待完成', this.studentId, 0, 5).then((res) => {
+		// 	console.log('pageAssignment', res)
+		// 	this.assignmentInfo = res.list[0]
+		// 	console.log(this.assignmentInfo)
+		// 	const courseId = this.assignmentInfo.courseId;
+		// 	const classId = this.assignmentInfo.classId;
+		// 	const examId = this.assignmentInfo.ecExamId;
+		// 	this.examId = examId
+		// 	const id = this.assignmentInfo.id;
+		// 	const ecExamRecordId = this.assignmentInfo.ecExamRecordId;
+		// 	startExam(examId, this.userId).then(() => {
+		// 		this.updateQuestionList().then(() => {
+		// 			this.timeLimitList = new Array(this.questionList.length).fill(0)
+		// 			this.timer = setInterval(() => {
+		// 				const newTime = this.timeLimitList[this.currentTopicIndex] + 1
+		// 				this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+		// 			}, 1000)
+		// 		})
+		// 		// findExamQuestionList(examId, this.userId).then((res) => {
+		// 		// 	console.log('findExamQuestionList', res)
+		// 		// })
+		// 	})
+		// })
 	},
 	onShow() {
 		if(this.examId !== 0) {
@@ -264,11 +347,15 @@ export default {
 			const questionList = this.questionList
 			const questionLength = this.questionList.length
 			dir ? newIndex += 1 : newIndex -= 1
-			if (newIndex > questionLength - 1 || newIndex < 0) {
-				return
+			if (newIndex > questionLength - 1) {
+				this.currentTopicIndex = 0
+				// this.order = questionList[0].order
+			} else if (newIndex < 0) {
+				this.currentTopicIndex = questionLength - 1
+				// this.order = questionList[this.currentTopicIndex].order
 			} else {
 				this.currentTopicIndex = newIndex
-				this.order = questionList[newIndex].order
+				// this.order = questionList[newIndex].order
 			}
 		},
 		// 展示或隐藏总览
@@ -297,14 +384,20 @@ export default {
 			this.storeFlag = false
 		},
     storeTopic() {
-      this.storeFlag = true
+			// this.storeFlag = true
+			this.switchTopic(true)
+			uni.showToast({
+				title: '暂存成功',
+				icon: 'success'
+			})
     },
 		submitTopic() {
+			console.log('submitTopic', this.submitFlag)
 			if (this.submitFlag === -1) {
 				this.submitFlag = 0
 			} else if (typeof this.submitFlag === 'object') {
 				this.submitFlag = new Array(this.submitFlag.length).fill(0)
-			} else if (submitFlag === true) {
+			} else if (this.submitFlag === true) {
 				this.submitTopicAction()
 			}
 		},
@@ -313,7 +406,7 @@ export default {
 		},
 		updateSubmitFlag(data) {
 			console.log('updateSubmitFlag', data, this.submitFlag)
-			if (data !== undefined) {
+			if (data !== undefined && typeof this.submitFlag === 'object') {
 				this.submitFlag.splice(data, 1, 1)
 			} else if (this.submitFlag === 0) {
 				this.submitFlag = 1
@@ -322,17 +415,40 @@ export default {
 			}
 		},
 		submitTopicAction() {
-			endExam(this.examId, this.userId).then((res) => {
-				console.log('endExam', res)
-				uni.showModal({
-					title: '提示',
-					content: '提交成功',
-				})
-				if (typeof this.submitFlag === 'number') {
-					this.submitFlag = -1
-				} else {
-					this.submitFlag = new Array(this.submitFlag.length).fill(-1)
-				}
+			const that = this
+			uni.showModal({
+				title: '确定要上交吗',
+				content: '作业上交后将无法继续作答，如需继续作答，请切换至下一题',
+				confirmText: '上交',
+        success(res) {
+          if (res.confirm) {
+            endExam(that.examId, that.userId).then((res) => {
+              console.log('endExam', res)
+              uni.showToast({
+                title: '提交成功',
+                icon: 'success',
+							})
+							clearInterval(that.timer)
+							that.showExitBtn = true
+              if (typeof that.submitFlag === 'number') {
+                that.submitFlag = -1
+              } else {
+                that.submitFlag = new Array(that.submitFlag.length).fill(-1)
+              }
+            })
+          }
+          if (res.cancel) {
+						console.log(that.submitFlag)
+            if (that.submitFlag === 1) {
+            	that.submitFlag = -1
+            } else if (typeof that.submitFlag === 'object') {
+							that.submitFlag = new Array(that.submitFlag.length).fill(-1)
+							console.log('object', that.submitFlag)
+            } else if (that.submitFlag === true) {
+              return
+            }
+          }
+        }
 			})
 		}
 	}
@@ -555,5 +671,23 @@ export default {
 			background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
 		}
 	}
+}
+.exit {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100;
+  background: rgba(0,0,0, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  .exitBtn {
+    color: #FFF;
+    padding: 2vw 10vw;
+    border-radius: 8vw;
+    background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
+  }
 }
 </style>

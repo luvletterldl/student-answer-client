@@ -4,6 +4,12 @@
   },
 	"pages": [
     {
+      "path" : "pages/answerPage/answerPage",
+      "style" : {
+        "navigationBarTitleText": "答题"
+      }
+    },
+    {
       "path" : "pages/initPage/initPage",
       "style" : {}
     },
@@ -17,12 +23,6 @@
       "path" : "pages/singleLessonMisson/singleLessonMisson",
       "style" : {
         "navigationBarTitleText": "单课次任务"
-      }
-    },
-    {
-      "path" : "pages/answerPage/answerPage",
-      "style" : {
-        "navigationBarTitleText": "答题"
       }
     },
     {

@@ -38,6 +38,9 @@ export default {
         if (this.audioCtx === undefined) {
           this.audioCtx = uni.createInnerAudioContext()
           this.onTimeUpdate = this.audioCtx.onTimeUpdate
+          this.bindAuidoCallback(this.audioCtx)
+        } else {
+          this.audioCtx.src = newSrc
         }
         if (this.audioCtx.play) {
           this.audioCtx.stop()
@@ -49,30 +52,38 @@ export default {
     this.audioCtx = uni.createInnerAudioContext()
     this.audioCtx.src = this.audioSrc
     this.audioCtx.startTime = 0
-    this.audioCtx.onTimeUpdate((e) => {
-      this.onTimeUpdate(e)
-    })
-    this.audioCtx.onCanplay((e) => {
-      this.onCanplay(e)
-    })
-    this.audioCtx.onPlay((e) => {
-      this.onPlay(e)
-    })
-    this.audioCtx.onEnded((e) => {
-      this.onEnded(e)
-    })
-    this.audioCtx.onError((e) => {
-      this.onError(e)
-    })
-    console.log('onLoad', this.audioCtx, this.audioSrc)
+    this.bindAuidoCallback(this.audioCtx)
+    // console.log('onLoad', this.audioCtx, this.audioSrc)
   },
   methods: {
+    bindAuidoCallback(ctx) {
+      ctx.onTimeUpdate((e) => {
+        this.onTimeUpdate(e)
+      })
+      ctx.onCanplay((e) => {
+        this.onCanplay(e)
+      })
+      ctx.onWaiting((e) => {
+        this.onWaiting(e)
+      })
+      ctx.onPlay((e) => {
+        this.onPlay(e)
+      })
+      ctx.onPause((e) => {
+        this.onPause(e)
+      })
+      ctx.onEnded((e) => {
+        this.onEnded(e)
+      })
+      ctx.onError((e) => {
+        this.onError(e)
+      })
+    },
     playOrStopAudio() {
       if (this.audioCtx === undefined) {
         this.audioCtx = uni.createInnerAudioContext()
         this.audioCtx.src = this.audioSrc
-        this.onTimeUpdate = this.audioCtx.onTimeUpdate
-        this.onCanplay = this.audioCtx.onCanplay
+        this.bindAuidoCallback(this.audioCtx)
       }
       if (this.audioCtx.paused) {
         this.audioCtx.play()
@@ -84,19 +95,41 @@ export default {
     },
     onTimeUpdate(e) {
       // console.log('onTimeUpdate', this.audioCtx.duration, this.audioCtx.currentTime)
-      if (this.currentTime !== Math.floor(this.audioCtx.currentTime)) {
+      if (this.audioCtx.currentTime > 0 && this.audioCtx.currentTime <= 1) {
+        this.currentTime = 1
+      } else if (this.currentTime !== Math.floor(this.audioCtx.currentTime)) {
         this.currentTime = Math.floor(this.audioCtx.currentTime)
       }
     },
     onCanplay(e) {
-      this.audioImg = iconPaused
+      if (this.audioImg === iconLoading) {
+        this.audioImg = iconPaused
+      }
       // console.log('onCanplay', e)
     },
+    onWaiting(e) {
+      if (this.audioImg !== iconLoading) {
+        this.audioImg = iconLoading
+      }
+    },
     onPlay(e) {
-      this.duration = Math.floor(this.audioCtx.duration)
+      console.log('onPlay', e)
+      // this.audioImg = iconPlaying
+      if (this.audioCtx.duration > 0 && this.audioCtx.duration <= 1) {
+        this.duration = 1
+      } else {
+        this.duration = Math.floor(this.audioCtx.duration)
+      }
+    },
+    onPause(e) {
+      console.log('onPause', e)
+      // this.audioImg = iconPaused
     },
     onEnded(e) {
-      this.audioImg = iconStop
+      console.log('onEnded', e)
+      if (this.audioImg !== iconPaused) {
+        this.audioImg = iconPaused
+      }
     },
     onError(e) {
       uni.showToast({

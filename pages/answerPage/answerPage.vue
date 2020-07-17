@@ -13,7 +13,7 @@
 						<text class="time-limit"><text class="cdtime">{{ currentTopicTimeCost }}</text>/{{ fmtSecToMin(currentTopic.timeLimit) }}</text>
 						<text class='currentIndex'>{{ questionList.length > 0 ? currentTopicIndex + 1 : 0 }}/{{ questionList.length }}</text>
 					</view>
-					<text @click="showOrHideTopicOverview" class='viewAll'>点击查看总览</text>
+					<text @click="showOrHideTopicOverview" class='viewAll'>{{ showTopicTab ? '点击收起总览' : '点击查看总览' }}</text>
 				</view>
 				<image @click='switchTopic(true)' src='../../static/images/icon_nextTopic.png' class='switcher' />
 			</view>
@@ -30,7 +30,7 @@
 						<text class="ques-type">{{ fmtQuestionType }}</text>
 						<text class="quest-index">{{ currentTopicIndex + 1 }}、</text>
 						<rich-text class="questBody" :nodes="fmtRichTextImg(currentTopic.quesBody)" />
-						<custom-audio v-if="currentTopic.audioLink !== null" :audioSrc="currentTopic.audioLink" />
+						<custom-audio v-if="currentTopic.audioLink !== null && currentTopic.audioLink !== ''" :audioSrc="currentTopic.audioLink" />
 						<topic-body
 							v-for="(ques, index) in currentTopic.subQuestions"
 							:key="index"
@@ -41,6 +41,7 @@
 							:clsId='clsId'
 							:examId='examId'
 							:examRecordDataId='examRecordDataId'
+							:userId='userId'
 							:studentId='studentId'
 							:time='timeLimitList[currentTopicIndex]'
 							:storeFlag='storeFlag'
@@ -58,6 +59,7 @@
 						:clsId='clsId'
 						:examId='examId'
 						:examRecordDataId='examRecordDataId'
+						:userId='userId'
 						:studentId='studentId'
 						:time='timeLimitList[currentTopicIndex]'
 						:storeFlag='storeFlag'
@@ -126,6 +128,7 @@ export default {
 			timer: 0, // 计时器,
 			storeFlag: false, // 暂存标识
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
+			isAnswering: null,
 		}
 	},
 	computed: {
@@ -183,9 +186,12 @@ export default {
 		}
 	},
 	onLoad(options) {
+		uni.setKeepScreenOn({
+			keepScreenOn: true
+		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		const url = 'https://test.xiaocongkj.com/?token=3bb13db90c584438a0facf99c8e46d19&key=U_E_17_11938&userId=11938&studentId=11969&examId=2512&examRecordDataId=2543&mainNum=5&className=0702口语班&courseName=0702教研课程&currentLessonNumber=第1课次&clsId=5027'
+		const url = 'https://test.xiaocongkj.com/?token=f63aa0dc1fbb4a62bf4551dbc3632f96&key=U_E_17_11938&userId=11938&studentId=11969&examId=2515&examRecordDataId=2570&mainNum=1&className=0702口语班&courseName=0702教研课程&currentLessonNumber=第3课次&clsId=5027&isAnswering=true'
 		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -228,10 +234,11 @@ export default {
 			'examId' in p &&
 			'examRecordDataId' in p &&
 			'studentId' in p &&
-			'userId' in p
+			'userId' in p &&
+			'isAnswering' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, courseName, currentLessonNumber, clsId, examId, examRecordDataId, studentId, userId} = p
+			const {token, key, mainNum, className, courseName, currentLessonNumber, clsId, examId, examRecordDataId, studentId, userId, isAnswering } = p
 			// this.token = token
 			// this.key = key
 			// this.mainNum = Number(mainNum)
@@ -244,6 +251,7 @@ export default {
 			this.examRecordDataId = Number(examRecordDataId)
 			this.studentId = Number(studentId)
 			this.userId = Number(userId)
+			this.isAnswering = isAnswering
 			header.key = key
 			header.token = token
 			startExam(this.examId, this.userId).then(() => {
@@ -322,12 +330,18 @@ export default {
 						subQuestions.forEach((subQues, j, arr) => {
 							if (data.order === subQues.order) {
 								subQuestions[j].studentAnswer = data.studentAnswer
+								if (subQuestions[j].questionType === QuestionType.SPOKEN_ANSWER_QUESTION) {
+									subQuestions[j].evaluation = data.evaluation
+								}
 								this.questionList.splice(i, 1, questionList[i])
 							}
 						})
 					} else {
 						if (data.order === ques.order) {
 							questionList[i].studentAnswer = data.studentAnswer
+							if (questionList[i].questionType === QuestionType.SPOKEN_ANSWER_QUESTION) {
+								questionList[i].evaluation = data.evaluation
+							}
 							this.questionList.splice(i, 1, questionList[i])
 						}
 					}
@@ -397,7 +411,9 @@ export default {
 				this.submitFlag = 0
 			} else if (typeof this.submitFlag === 'object') {
 				this.submitFlag = new Array(this.submitFlag.length).fill(0)
-			} else if (this.submitFlag === true) {
+			// } else if (this.submitFlag === true) {
+			// 	this.submitTopicAction()
+			} else {
 				this.submitTopicAction()
 			}
 		},
@@ -415,6 +431,15 @@ export default {
 			}
 		},
 		submitTopicAction() {
+			console.log('submitTopicAction', this.isAnswering)
+			if (this.isAnswering === true || this.isAnswering === 'true') {
+				uni.showModal({
+					title: '提示',
+					content: '请在原终端进行提交!',
+          showCancel: false,
+				})
+        return false
+			}
 			const that = this
 			uni.showModal({
 				title: '确定要上交吗',

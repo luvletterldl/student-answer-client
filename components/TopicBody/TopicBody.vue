@@ -4,7 +4,7 @@
       <text class="ques-type">{{ fmtQuestionType }}</text>
       <text class="quest-index">{{ questionIndex + 1 }}、</text>
       <rich-text class="questBody" :nodes="fmtRichTextImg(question.quesBody)" />
-      <custom-audio v-if="question.audioLink !== null" :audioSrc="question.audioLink" />
+      <custom-audio v-if="question.audioLink !== null && question.audioLink !== ''" :audioSrc="question.audioLink" />
     </view>
     <view v-if="question.questionType === QuestionType.SINGLE_ANSWER_QUESTION || question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION" class="options">
       <view @click="chooseSelectItem(question, index)" v-for="(option, index) in question.quesOptions" :key="index" class="option">
@@ -32,7 +32,7 @@
         <image @click="recordAction" :src="recordImg" class="record"/>
         <text class="record-desc">{{ recordDesc }}</text>
         <custom-audio
-          v-if="question.studentAnswer !== null"
+          v-if="question.studentAnswer !== null && question.studentAnswer !== ''"
           class="custom-audio"
           :audioSrc='question.studentAnswer'
         />
@@ -141,6 +141,7 @@ export default {
   watch: {
     question: {
       handler(newQues, oldQues) {
+        console.log('watchQuestion handler', newQues, oldQues)
         if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1) {
           if (oldQues) {
             console.log('oldQues', oldQues, 'oldQues.questionType', oldQues.questionType)
@@ -249,7 +250,7 @@ export default {
     this.rm.onStart((e) => this.onStart(e))
     this.rm.onPause((e) => this.onPause(e))
     this.rm.onResume((e) => this.onResume(e))
-    this.rm.onStop((e) => this.onStop(e))
+    // this.rm.onStop((e) => this.onStop(e))
     this.rm.onInterruptionBegin((e) => this.onInterruptionBegin(e))
     this.rm.onInterruptionEnd((e) => this.onInterruptionEnd(e))
     this.rm.onError((e) => this.onError(e))
@@ -398,9 +399,14 @@ export default {
         sizeType: ['compressed'],
 			}).then((res) => {
         if (res[0] === null) {
+          uni.showLoading({
+            title: '上传中...',
+          })
 					const filePath = res[1].tempFilePaths[0]
 					console.log(res, this.clsId, this.examId, filePath)
           uploadImageToAliOss(this.clsId, this.examId, filePath).then((resp) => {
+            uni.hideLoading()
+            uni.showLoading({ title: '提交中...' })
 						console.log('uploadImageToAliOss', resp, question)
 						currentServerTime().then(serverTime => {
 							examSubmit(this.examId, this.userId, serverTime, [{ // 这里学生id要用userId ...
@@ -408,14 +414,18 @@ export default {
 								studentAnswer: resp,
 								time: this.time,
 							}]).then((res) => {
+                uni.hideLoading()
 								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, studentAnswer: resp}) )
-							})
+							}).catch((err) => {
+                uni.hideLoading()
+              })
 						})
           }).catch((err) => {
-						console.log('uploadImageToAliOss error', err)
+            console.log('uploadImageToAliOss error', err)
+            uni.hideLoading()
 					})
         } else {
-          throw new Error(res[0])
+          throw new Error(res)
         }
       })
     },
@@ -427,12 +437,14 @@ export default {
           sampleRate: 22050,
         })
         this.recordStatus = 1
-      } else if (!this.stop) {
+        this.rm.onStop((e) => this.onStop(e))
+      } else if (this.recordStatus === 1) {
         this.rm.stop()
         this.recordStatus = 2
       }
     },
     onStart(e) {
+      console.log('开始录音', this.question, this.subQuesIndex)
       console.log(e)
     },
     onPause(e) {
@@ -446,6 +458,7 @@ export default {
       uni.showLoading({
         title: '录音上传中...'
       })
+      console.log('录音上传中', this.question, this.subQuesIndex)
       uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
         const data = JSON.parse(res)
         uni.hideLoading()
@@ -464,15 +477,15 @@ export default {
           } else if (status === 'Finished') {
             this.spokenResult = resp.data.evaluation
             uni.hideLoading()
-            currentServerTime().then((time) => {
-              examSubmit(this.examId, this.userId, time, [{
+            currentServerTime().then((serverTime) => {
+              examSubmit(this.examId, this.userId, serverTime, [{
                 order: this.question.order,
                 time: this.time,
                 mediaId: data.data.id,
                 audioText: this.question.audioText,
                 studentAnswer: answerNormalLink
               }]).then((res) => {
-                this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink}))
+                this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
               })
             })
           }

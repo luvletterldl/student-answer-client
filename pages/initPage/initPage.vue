@@ -35,7 +35,7 @@ export default {
       //     icon: 'none'
       //   })
       //   return
-      // }
+      // }  
       clientLogin(this.account, this.password).then((res) => {
         console.log(res)
         const code = res.code

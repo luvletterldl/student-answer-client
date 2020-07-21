@@ -232,7 +232,7 @@ export default {
 			'currentLessonNumber' in p &&
 			'clsId' in p &&
 			'examId' in p &&
-			'examRecordDataId' in p &&
+			// 'examRecordDataId' in p &&
 			'studentId' in p &&
 			'userId' in p &&
 			'isAnswering' in p
@@ -254,7 +254,8 @@ export default {
 			this.isAnswering = isAnswering
 			header.key = key
 			header.token = token
-			startExam(this.examId, this.userId).then(() => {
+			startExam(this.examId, this.userId).then(res => {
+				this.examRecordDataId = res.examRecordDataId
 				this.updateQuestionList().then(() => {
 					this.timeLimitList = new Array(this.questionList.length).fill(0)
 					this.timer = setInterval(() => {

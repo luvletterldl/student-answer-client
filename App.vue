@@ -1,5 +1,11 @@
 <script>
 export default {
+	globalData: {  
+		text: 'text',
+		// 保证全局只有一个音频处于播放状态且录音与播放操作互斥
+		audioPlaying: false,
+		audioRecording: false,
+	},  
 	onLaunch: function() {
 		console.log('App Launch');
 	},

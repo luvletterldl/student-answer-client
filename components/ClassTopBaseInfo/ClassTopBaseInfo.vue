@@ -2,10 +2,11 @@
   <view class="topBaseInfo">
     <view class='lessonName'>
       <text class="lessonNumber">{{ currentLessonNumber }}</text>
+      <text class="courseName">{{ courseName }}</text>
       <img @click="showOrHideCCName" class="showOrHide" :class="showCCName ? '' : 'hideStatus'" src="../../static/images/icon_answerSOH.png" />
     </view>
     <view v-show="showCCName" class='clsName'>{{ className }}</view>
-    <view v-show="showCCName" class='courseName'>{{ courseName }}</view>
+    <!-- <view v-show="showCCName" class='courseName'>{{ courseName }}</view> -->
   </view>
 </template>
 
@@ -28,7 +29,7 @@ export default {
   },
   data() {
     return {
-      showCCName: true
+      showCCName: false
     }
   },
   methods: {
@@ -55,12 +56,19 @@ export default {
     display: flex;
     flex-flow: row;
     justify-content: space-between;
+    align-items: center;
     .lessonNumber {
       background: linear-gradient(180deg,#FED57B 0%,#FEB039 100%);
       border-radius: 2vw;
       font-size: 3vw;
       padding: 1.5vw 2vw;
       box-shadow: 0 1vw 1.5vw rgba(254,213,123, .5);
+      max-width: 20vw;
+    }
+    .courseName {
+      font-size: 3.6vw;
+      font-weight: normal;
+      max-width: 50vw;
     }
     .showOrHide {
       width: 6vw;
@@ -75,10 +83,6 @@ export default {
     font-size: 4.6vw;
     font-weight: 600;
     margin: 1.5vw 0;
-  }
-  .courseName {
-    font-size: 3.6vw;
-    font-weight: normal;
   }
 }
 </style>

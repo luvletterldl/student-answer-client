@@ -191,7 +191,7 @@ export default {
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		const url = 'https://test.xiaocongkj.com/?token=f63aa0dc1fbb4a62bf4551dbc3632f96&key=U_E_17_11938&userId=11938&studentId=11969&examId=2515&examRecordDataId=2570&mainNum=1&className=0702口语班&courseName=0702教研课程&currentLessonNumber=第3课次&clsId=5027&isAnswering=true'
+		const url = 'https://test.xiaocongkj.com/?token=e25bcfebc97441d9a6c4068468a7f9ba&key=U_E_17_11952&userId=11952&studentId=11984&examId=2618&examRecordDataId=2617&mainNum=1&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第3课次&clsId=5066&isAnswering=true'
 		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -357,19 +357,35 @@ export default {
 		},
 		// 左右切换题目
 		switchTopic(dir) {
-			let newIndex = this.currentTopicIndex
-			const questionList = this.questionList
-			const questionLength = this.questionList.length
-			dir ? newIndex += 1 : newIndex -= 1
-			if (newIndex > questionLength - 1) {
-				this.currentTopicIndex = 0
-				// this.order = questionList[0].order
-			} else if (newIndex < 0) {
-				this.currentTopicIndex = questionLength - 1
-				// this.order = questionList[this.currentTopicIndex].order
+			const audioPlaying = getApp().globalData.audioPlaying
+			const audioRecording = getApp().globalData.audioRecording
+			if (audioPlaying || audioRecording) {
+				let title = ''
+				if (audioPlaying) {
+					title = '请先暂停音频播放'
+				} else if (audioRecording) {
+					title = '请先结束录音'
+				}
+				uni.showToast({
+					title: title,
+					icon: 'none'
+				})
+				return false
 			} else {
-				this.currentTopicIndex = newIndex
-				// this.order = questionList[newIndex].order
+				let newIndex = this.currentTopicIndex
+				const questionList = this.questionList
+				const questionLength = this.questionList.length
+				dir ? newIndex += 1 : newIndex -= 1
+				if (newIndex > questionLength - 1) {
+					this.currentTopicIndex = 0
+					// this.order = questionList[0].order
+				} else if (newIndex < 0) {
+					this.currentTopicIndex = questionLength - 1
+					// this.order = questionList[this.currentTopicIndex].order
+				} else {
+					this.currentTopicIndex = newIndex
+					// this.order = questionList[newIndex].order
+				}
 			}
 		},
 		// 展示或隐藏总览
@@ -406,6 +422,14 @@ export default {
 			})
     },
 		submitTopic() {
+			if (this.isAnswering === 'true' || this.isAnswering === true) {
+				uni.showModal({
+					title: '提示',
+					content: '请在原终端进行提交!',
+          showCancel: false,
+				})
+        return false
+			}
 			console.log('submitTopic', this.submitFlag)
 			if (this.submitFlag === -1) {
 				this.submitFlag = 0
@@ -431,15 +455,6 @@ export default {
 			}
 		},
 		submitTopicAction() {
-			console.log('submitTopicAction', this.isAnswering)
-			if (this.isAnswering === true || this.isAnswering === 'true') {
-				uni.showModal({
-					title: '提示',
-					content: '请在原终端进行提交!',
-          showCancel: false,
-				})
-        return false
-			}
 			const that = this
 			uni.showModal({
 				title: '确定要上交吗',

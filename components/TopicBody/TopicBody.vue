@@ -55,7 +55,7 @@ import Main from '../../lib/Main'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
 import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam } from '../../lib/Api'
-import { formatQuestionType, formatRichTextImg } from '../../lib/Utils';
+import { formatQuestionType, formatRichTextImg, beforeAudioRecordOrPlay, afterAudioRecord } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
 export default {
@@ -431,16 +431,19 @@ export default {
     },
     recordAction() {
       if (this.recordStatus === 0 || this.recordStatus === 2) {
-        this.rm.start({
-          duration: 600000,
-          format: 'mp3',
-          sampleRate: 22050,
-        })
-        this.recordStatus = 1
-        this.rm.onStop((e) => this.onStop(e))
+        if (beforeAudioRecordOrPlay('record')) {
+          this.rm.start({
+            duration: 600000,
+            format: 'mp3',
+            sampleRate: 22050,
+          })
+          this.recordStatus = 1
+          this.rm.onStop((e) => this.onStop(e))
+        }
       } else if (this.recordStatus === 1) {
         this.rm.stop()
         this.recordStatus = 2
+        afterAudioRecord()
       }
     },
     onStart(e) {
@@ -449,12 +452,14 @@ export default {
     },
     onPause(e) {
       console.log(e)
+      afterAudioRecord()
     },
     onResume(e) {
       console.log(e)
     },
     onStop(e) {
       console.log(e)
+      afterAudioRecord()
       uni.showLoading({
         title: '录音上传中...'
       })

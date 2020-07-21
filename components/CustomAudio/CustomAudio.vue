@@ -7,7 +7,7 @@
 
 <script>
 import dayjs from 'dayjs'
-import { formatSecondToMinSecond } from '../../lib/Utils'
+import { formatSecondToMinSecond, afterAudioPlay, beforeAudioRecordOrPlay } from '../../lib/Utils'
 const iconPaused = '../../static/images/icon_paused.png'
 const iconPlaying = '../../static/images/icon_playing.png'
 const iconStop = '../../static/images/icon_stop.png'
@@ -44,6 +44,7 @@ export default {
         }
         if (this.audioCtx.play) {
           this.audioCtx.stop()
+          getApp().globalData.audioPlaying = false
         }
       }
     }
@@ -86,10 +87,13 @@ export default {
         this.bindAuidoCallback(this.audioCtx)
       }
       if (this.audioCtx.paused) {
-        this.audioCtx.play()
-        this.audioImg = iconPlaying
+        if (beforeAudioRecordOrPlay('play')) {
+          this.audioCtx.play()
+          this.audioImg = iconPlaying
+        }
       } else {
         this.audioCtx.pause()
+        afterAudioPlay()
         this.audioImg = iconPaused
       }
     },
@@ -113,7 +117,7 @@ export default {
       }
     },
     onPlay(e) {
-      console.log('onPlay', e)
+      console.log('onPlay', e, this.audioCtx.duration)
       // this.audioImg = iconPlaying
       if (this.audioCtx.duration > 0 && this.audioCtx.duration <= 1) {
         this.duration = 1
@@ -130,6 +134,7 @@ export default {
       if (this.audioImg !== iconPaused) {
         this.audioImg = iconPaused
       }
+      afterAudioPlay()
     },
     onError(e) {
       uni.showToast({

@@ -1,7 +1,8 @@
 <template>
   <view class="custom-audio">
-    <image @click="playOrStopAudio" :src="audioImg" class="audio-btn" />
-    <text>{{ fmtSecond(currentTime) }}/{{ fmtSecond(duration) }}</text>
+    <image v-if="audioSrc !== ''" @click="playOrStopAudio" :src="audioImg" class="audio-btn" />
+    <text v-else @click="tips" class="audio-btn">无音源</text>
+    <text v-if="showTime">{{ fmtSecond(currentTime) }}/{{ fmtSecond(duration) }}</text>
   </view>
 </template>
 
@@ -18,6 +19,11 @@ export default {
     audioSrc: {
       type: String,
       default: ''
+    },
+    showTime: {
+      type: Boolean,
+      required: false,
+      default: true
     }
   },
   data() {
@@ -78,6 +84,12 @@ export default {
       })
       ctx.onError((e) => {
         this.onError(e)
+      })
+    },
+    tips(){
+      uni.showToast({
+        title: '无效音源,请先录音',
+        icon: 'none'
       })
     },
     playOrStopAudio() {
@@ -161,12 +173,15 @@ export default {
   flex-flow: row no-wrap;
   align-items: center;
   justify-content: space-between;
-  padding: 2vw 5vw;
+  padding: 2vw;
   font-size: 14px;
   .audio-btn {
     width: 10vw;
     height: 10vw;
-    margin-right: 2vw;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 </style>

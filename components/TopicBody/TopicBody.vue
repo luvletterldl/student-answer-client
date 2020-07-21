@@ -29,20 +29,22 @@
     </view>
     <view v-if="question.questionType === QuestionType.SPOKEN_ANSWER_QUESTION" class="recorder-panel">
       <view class="record-part">
-        <image @click="recordAction" :src="recordImg" class="record"/>
-        <text class="record-desc">{{ recordDesc }}</text>
-        <custom-audio
-          v-if="question.studentAnswer !== null && question.studentAnswer !== ''"
-          class="custom-audio"
-          :audioSrc='question.studentAnswer'
-        />
+        <text>音频文本: {{ question.audioText }}</text>
+        <!-- <text class="record-desc">{{ recordDesc }}</text> -->
       </view>
       <view class="audio-evoluation">
+        <view class="record-desc">{{ recordDesc }}</view>
         <view class="audio-text">
-          <text>音频文本: {{ question.audioText }}</text>
+            <!-- v-if="question.studentAnswer !== null && question.studentAnswer !== ''" -->
+          <custom-audio
+            class="custom-audio"
+            :audioSrc='question.studentAnswer'
+            :showTime="false"
+          />
+          <image @click="recordAction" :src="recordImg" class="record"/>
+          <text class="evaluationAccuracy">{{ evaluationAccuracy }}</text>
         </view>
         <view class="evoluation">
-          <text>口语评价: {{ evaluationAccuracy }}分</text>
           <rich-text class="words" :nodes="fmtRichTextImg(evaluationResult)" />
         </view>
       </view>
@@ -615,20 +617,21 @@ export default {
     align-items: center;
     padding: 3vw;
     color: $blackcolor;
+    border-bottom: 2px solid $default-bgcolor;
     .record-part {
       display: flex;
       flex-flow: row nowrap;
       align-items: center;
       justify-content: flex-start;
       width: 100%;
-      .record {
-        border-radius: 100%;
-        border: #c0c0c0 solid 1px;
-        width: 10vw;
-        height: 10vw;
-        flex-shrink: 0;
-        margin-right: 3vw;
-      }
+      // .record {
+      //   border-radius: 100%;
+      //   border: #c0c0c0 solid 1px;
+      //   width: 10vw;
+      //   height: 10vw;
+      //   flex-shrink: 0;
+      //   margin-right: 3vw;
+      // }
       .record-desc {
         width: 45%;
       }
@@ -638,10 +641,41 @@ export default {
       flex-flow: column;
       align-items: center;
       width: 100%;
+      padding: 2vw;
+      border: $default-bgcolor 1px solid;
       .audio-text, .evoluation {
         width: 100%;
         margin-top: 2vw;
         text-align: left;
+        display: flex;
+        flex-flow: row nowrap;
+        align-items: center;
+        justify-content: space-between;
+        .custom-audio {
+          border-radius: 100%;
+          padding: 2vw;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .record {
+          border-radius: 100%;
+          border: #c0c0c0 solid 1px;
+          width: 10vw;
+          height: 10vw;
+          flex-shrink: 0;
+          // margin-right: 3vw;
+        }
+        .evaluationAccuracy {
+          border-radius: 100%;
+          width: 10vw;
+          height: 10vw;
+          border: #c0c0c0 solid 1px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
       }
     }
   }

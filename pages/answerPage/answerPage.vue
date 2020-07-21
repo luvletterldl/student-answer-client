@@ -191,8 +191,8 @@ export default {
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		const url = 'https://test.xiaocongkj.com/?token=e25bcfebc97441d9a6c4068468a7f9ba&key=U_E_17_11952&userId=11952&studentId=11984&examId=2618&examRecordDataId=2617&mainNum=1&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第3课次&clsId=5066&isAnswering=true'
-		// const url = decodeURIComponent(options.q)
+		// const url = 'https://test.xiaocongkj.com/?token=c5b5655e3f1f4e7f936c2bd0e6893ba6&key=U_E_17_11952&userId=11952&studentId=11984&examId=2587&examRecordDataId=2630&mainNum=11&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第1课次&clsId=5066&isAnswering=true'
+		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const getParams = (url) => {

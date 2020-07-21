@@ -257,16 +257,16 @@ export default {
 			'mainNum' in p &&
 			'className' in p &&
 			'courseName' in p &&
-			'currentLessonNumber' in p &&
+			// 'currentLessonNumber' in p &&
 			'clsId' in p &&
 			'examId' in p &&
-			'examRecordDataId' in p &&
+			// 'examRecordDataId' in p &&
 			'studentId' in p &&
 			'userId' in p &&
 			'isAnswering' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, courseName, currentLessonNumber, clsId, examId, examRecordDataId, studentId, userId, isAnswering } = p
+			const {token, key, mainNum, className, courseName, clsId, examId, studentId, userId, isAnswering } = p
 			// this.token = token
 			// this.key = key
 			// this.mainNum = Number(mainNum)
@@ -276,7 +276,7 @@ export default {
 			this.currentLessonNumber = currentLessonNumber
 			this.clsId = Number(clsId)
 			this.examId = Number(examId)
-			this.examRecordDataId = Number(examRecordDataId)
+			// this.examRecordDataId = Number(examRecordDataId)
 			this.studentId = Number(studentId)
 			this.userId = Number(userId)
 			this.isAnswering = isAnswering
@@ -291,6 +291,7 @@ export default {
 					})
 					this.showExitBtn = true
 				} else {
+					this.examRecordDataId = res.examRecordDataId
 					this.durationSeconds = res.duration * 60
 					this.countdownTimer = setInterval(() => {
 						this.durationSeconds -= 1

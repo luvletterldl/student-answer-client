@@ -13,7 +13,10 @@
 						<text class="time-limit"><text class="cdtime">{{ currentTopicTimeCost }}</text>/{{ fmtSecToMin(currentTopic.timeLimit) }}</text>
 						<text class='currentIndex'>{{ questionList.length > 0 ? currentTopicIndex + 1 : 0 }}/{{ questionList.length }}</text>
 					</view>
-					<text @click="showOrHideTopicOverview" class='viewAll'>{{ showTopicTab ? '点击收起总览' : '点击查看总览' }}</text>
+					<view @click="showOrHideTopicOverview" class='viewAll'>
+						<text>剩余时间：{{ remineTime }}</text>
+						<text>{{ showTopicTab ? '点击收起总览' : '点击查看总览' }}</text>
+					</view>
 				</view>
 				<image @click='switchTopic(true)' src='../../static/images/icon_nextTopic.png' class='switcher' />
 			</view>
@@ -88,9 +91,9 @@ import RecorderPanel from '../../components/RecorderPanel/RecorderPanel'
 import TopicBody from '../../components/TopicBody/TopicBody'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
-import { formatQuestionType, formatSecondToMinSecond, formatRichTextImg } from '../../lib/Utils';
+import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam, header } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam, examHeartbeat, header } from '../../lib/Api'
 export default {
 	components: {
 		ClassTopBaseInfo,
@@ -125,7 +128,10 @@ export default {
 			selectedOptions: [], // 选择题选中的索引列表
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
+			durationSeconds: 0, // 剩余考试时间（秒）
+			remineTime: '', // 剩余考试时间
 			timer: 0, // 计时器,
+			countdownTimer: 0, // 考试剩余时间计时器
 			storeFlag: false, // 暂存标识
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
 			isAnswering: null,
@@ -183,16 +189,38 @@ export default {
 				}
 			},
 			deep: true
+		},
+		durationSeconds: {
+			handler(newSec, oldSec) {
+				if (newSec <= 0) {
+					uni.showToast({
+						title: '答题时间到！',
+						icon: 'none'
+					})
+					this.endExamAction()
+				}
+			}
 		}
 	},
 	onLoad(options) {
+    const query = wx.createSelectorQuery()
+    query.select('.viewAll').fields({
+      dataset: true,
+      rect: true,
+      size: true,
+      scrollOffset: true,
+      computedStyle: ['margin', 'backgroundColor'],
+      context: true,
+    }, (res) => {
+      console.log('createSelectorQuery', res)
+    }).exec()
 		uni.setKeepScreenOn({
 			keepScreenOn: true
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		// const url = 'https://test.xiaocongkj.com/?token=c5b5655e3f1f4e7f936c2bd0e6893ba6&key=U_E_17_11952&userId=11952&studentId=11984&examId=2587&examRecordDataId=2630&mainNum=11&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第1课次&clsId=5066&isAnswering=true'
-		const url = decodeURIComponent(options.q)
+		const url = 'https://test.xiaocongkj.com/?token=c5b5655e3f1f4e7f936c2bd0e6893ba6&key=U_E_17_11952&userId=11952&studentId=11984&examId=2622&examRecordDataId=2642&mainNum=1&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第4课次&clsId=5066&isAnswering=true'
+		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const getParams = (url) => {
@@ -254,14 +282,29 @@ export default {
 			this.isAnswering = isAnswering
 			header.key = key
 			header.token = token
-			startExam(this.examId, this.userId).then(() => {
-				this.updateQuestionList().then(() => {
-					this.timeLimitList = new Array(this.questionList.length).fill(0)
-					this.timer = setInterval(() => {
-						const newTime = this.timeLimitList[this.currentTopicIndex] + 1
-						this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+			startExam(this.examId, this.userId).then((res) => {
+				console.log('startExam', res)
+				if (res.code === "E_K12-OE_M2001") {
+					uni.showToast({
+						title: res.desc,
+						icon: 'none'
+					})
+					this.showExitBtn = true
+				} else {
+					this.durationSeconds = res.duration * 60
+					this.countdownTimer = setInterval(() => {
+						this.durationSeconds -= 1
+						const remineTime = formatSecondToHHmmss(this.durationSeconds)
+						this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
 					}, 1000)
-				})
+					this.updateQuestionList().then(() => {
+						this.timeLimitList = new Array(this.questionList.length).fill(0)
+						this.timer = setInterval(() => {
+							const newTime = this.timeLimitList[this.currentTopicIndex] + 1
+							this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+						}, 1000)
+					})
+				}
 			})
 		} else {
 			this.showDefaultView = true
@@ -316,7 +359,8 @@ export default {
 		}
 	},
   beforeDestroy() {
-    clearInterval(this.timer)
+		clearInterval(this.timer)
+		clearInterval(this.countdownTimer)
   },
 	methods: {
 		updateQuestionList(params) {
@@ -404,7 +448,7 @@ export default {
 		// 倒计时
 		fmtSecToMin(time) {
 			if (this.timeLimitList.length > 0) {
-				const fmtTime = formatSecondToMinSecond(time)
+				const fmtTime = formatSecondToHHmmss(time)
 				return `${fmtTime.min}:${fmtTime.second}`
 			} else {
 				return '0:0'
@@ -454,6 +498,31 @@ export default {
 				return
 			}
 		},
+		endExamAction() {
+			endExam(this.examId, this.userId).then((res) => {
+				if (res.code === 'M3001') {
+					uni.showToast({
+						title: res.desc,
+						icon: 'none'
+					})
+					return
+				} else {
+					uni.showToast({
+						title: '提交成功',
+						icon: 'success',
+					})
+					clearInterval(this.countdownTimer)
+					clearInterval(this.timer)
+					this.showExitBtn = true
+					if (typeof this.submitFlag === 'number') {
+						this.submitFlag = -1
+					} else {
+						this.submitFlag = new Array(this.submitFlag.length).fill(-1)
+					}
+				}
+				console.log('endExam', res)
+			})
+		},
 		submitTopicAction() {
 			const that = this
 			uni.showModal({
@@ -462,20 +531,7 @@ export default {
 				confirmText: '上交',
         success(res) {
           if (res.confirm) {
-            endExam(that.examId, that.userId).then((res) => {
-              console.log('endExam', res)
-              uni.showToast({
-                title: '提交成功',
-                icon: 'success',
-							})
-							clearInterval(that.timer)
-							that.showExitBtn = true
-              if (typeof that.submitFlag === 'number') {
-                that.submitFlag = -1
-              } else {
-                that.submitFlag = new Array(that.submitFlag.length).fill(-1)
-              }
-            })
+            that.endExamAction()
           }
           if (res.cancel) {
 						console.log(that.submitFlag)
@@ -526,7 +582,7 @@ export default {
       .currentIndex {
         color: #36415C;
 			}
-			.process {
+			.process, .viewAll {
 				width: 100%;
 				display: flex;
 				flex-flow: row nowrap;

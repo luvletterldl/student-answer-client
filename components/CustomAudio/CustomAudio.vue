@@ -8,7 +8,7 @@
 
 <script>
 import dayjs from 'dayjs'
-import { formatSecondToMinSecond, afterAudioPlay, beforeAudioRecordOrPlay } from '../../lib/Utils'
+import { formatSecondToHHmmss, afterAudioPlay, beforeAudioRecordOrPlay } from '../../lib/Utils'
 const iconPaused = '../../static/images/icon_paused.png'
 const iconPlaying = '../../static/images/icon_playing.png'
 const iconStop = '../../static/images/icon_stop.png'
@@ -156,7 +156,7 @@ export default {
       throw new Error(e.errMsg, e.errCode)
     },
     fmtSecond(sec) {
-      const { min, second } = formatSecondToMinSecond(sec)
+      const { min, second } = formatSecondToHHmmss(sec)
       return `${min}:${second}`
     }
   }

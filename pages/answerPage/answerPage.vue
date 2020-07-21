@@ -257,7 +257,7 @@ export default {
 			'mainNum' in p &&
 			'className' in p &&
 			'courseName' in p &&
-			// 'currentLessonNumber' in p &&
+			'currentLessonNumber' in p &&
 			'clsId' in p &&
 			'examId' in p &&
 			// 'examRecordDataId' in p &&
@@ -266,7 +266,7 @@ export default {
 			'isAnswering' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, courseName, clsId, examId, studentId, userId, isAnswering } = p
+			const {token, key, mainNum, className, currentLessonNumber, courseName, clsId, examId, studentId, userId, isAnswering } = p
 			// this.token = token
 			// this.key = key
 			// this.mainNum = Number(mainNum)

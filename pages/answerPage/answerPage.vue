@@ -15,7 +15,7 @@
 						<text class='currentIndex'>{{ questionList.length > 0 ? currentTopicIndex + 1 : 0 }}/{{ questionList.length }}</text>
 					</view>
 					<view @click="showOrHideTopicOverview" class='viewAll'>
-						<text>剩余时间：{{ remineTime }}</text>
+						<text v-if="duration !== null">剩余时间：{{ remineTime }}</text>
 						<text>{{ showTopicTab ? '点击收起总览' : '点击查看总览' }}</text>
 					</view>
 				</view>
@@ -143,7 +143,8 @@ export default {
 			selectedOptions: [], // 选择题选中的索引列表
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
-			durationSeconds: 0, // 剩余考试时间（秒）
+			duration: null, // 剩余考试时间（分钟）
+			durationSeconds: 1, // 剩余考试时间（秒）
 			remineTime: '', // 剩余考试时间
 			timer: 0, // 计时器,
 			countdownTimer: 0, // 考试剩余时间计时器
@@ -211,7 +212,8 @@ export default {
 		},
 		durationSeconds: {
 			handler(newSec, oldSec) {
-				if (newSec <= 0) {
+				console.log('durationSeconds', newSec, oldSec)
+				if (newSec <= 0 && this.duration !== null) {
 					uni.showToast({
 						title: '答题时间到！',
 						icon: 'none'
@@ -231,7 +233,7 @@ export default {
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		// const url = 'https://test.xiaocongkj.com/?token=2268d1821df4434ab8b2ca742481dc38&key=U_E_17_11952&userId=11952&studentId=11984&examId=1214&mainNum=1&className=1126三班&courseName=1125教研二&currentLessonNumber=第1课次&clsId=4097&isAnswering=false&account=15911111121'
+		// const url = 'https://test.xiaocongkj.com/?token=7a7fb7a6de4a4d5387fb3157625583a7&key=U_S_17_11923&userId=11923&studentId=11954&examId=2303&mainNum=1&className=0616二班&courseName=0616教研一&currentLessonNumber=1.2&clsId=4958&isAnswering=false&account=15911111101'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -308,12 +310,15 @@ export default {
 					this.showExitBtn = true
 				} else {
 					this.examRecordDataId = res.examRecordDataId
-					this.durationSeconds = res.duration * 60
-					this.countdownTimer = setInterval(() => {
-						this.durationSeconds -= 1
-						const remineTime = formatSecondToHHmmss(this.durationSeconds)
-						this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
-					}, 1000)
+					this.duration = res.duration
+					if (res.duration !== null) {
+						this.durationSeconds = res.duration * 60
+						this.countdownTimer = setInterval(() => {
+							this.durationSeconds -= 1
+							const remineTime = formatSecondToHHmmss(this.durationSeconds)
+							this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
+						}, 1000)
+					}
 					this.updateQuestionList().then(() => {
 						this.timeLimitList = new Array(this.questionList.length).fill(0)
 						this.timer = setInterval(() => {
@@ -424,7 +429,15 @@ export default {
 			} else {
 				return getQuestions(this.examId, this.userId).then((res) => {
 					console.log('getQuestions', res)
-					this.questionList = res.data
+					if (res.code === "E_K12-OE_S2001") {
+						uni.showToast({
+							title: res.desc,
+							icon: 'none'
+						})
+						return
+					} else {
+						this.questionList = res.data
+					}
 				})
 			}
 		},

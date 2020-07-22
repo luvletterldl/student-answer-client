@@ -1,12 +1,11 @@
 <template>
-  <view class="topBaseInfo">
+  <view class="topBaseInfo" :style="answerGuideIndex === 0 ? 'z-index: 101' : 'z-index: 0'">
     <view class='lessonName'>
       <text class="lessonNumber">{{ currentLessonNumber }}</text>
       <text class="courseName">{{ courseName }}</text>
       <img @click="showOrHideCCName" class="showOrHide" :class="showCCName ? '' : 'hideStatus'" src="../../static/images/icon_answerSOH.png" />
     </view>
     <view v-show="showCCName" class='clsName'>{{ className }}</view>
-    <!-- <view v-show="showCCName" class='courseName'>{{ courseName }}</view> -->
   </view>
 </template>
 
@@ -25,6 +24,10 @@ export default {
     currentLessonNumber: {
       type: String,
       required: true
+    },
+    answerGuideIndex: {
+      type: Number,
+      required: false,
     }
   },
   data() {
@@ -42,6 +45,8 @@ export default {
 
 <style lang='scss' scoped>
 .topBaseInfo {
+  position: relative;
+  z-index: 0;
   width: 90vw;
   padding: 5vw;
   margin: 2vw 5vw;

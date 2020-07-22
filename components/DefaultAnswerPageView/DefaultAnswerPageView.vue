@@ -17,7 +17,7 @@ export default {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 99;
+  z-index: 103;
   font-size: large;
   width: 100vw;
   height: 100vh;

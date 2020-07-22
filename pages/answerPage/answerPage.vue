@@ -1,12 +1,13 @@
 <template>
 	<view class="container">
-		<ClassTopBaseInfo
+		<class-top-base-info
+			:answerGuideIndex='answerGuideIndex'
 			:className='className'
 			:courseName='courseName'
 			:currentLessonNumber='currentLessonNumber'
 		/>
 		<view class="answer-panel">
-			<view class="topic-switch">
+			<view class="topic-switch" :style="answerGuideIndex === 1 ? 'z-index: 101' : 'z-index: 0'">
 				<image @click='switchTopic(false)' src='../../static/images/icon_prevTopic.png' class='switcher' />
 				<view class='topicProcess'>
 					<view class='process'>
@@ -27,7 +28,7 @@
 					</view>
 				</view>
 			</view>
-			<view class="topic-list">
+			<view class="topic-list" :style="answerGuideIndex === 2 ? 'z-index: 101' : 'z-index: 0'">
 				<view v-if="currentTopic.hasSub === true" class="topic-body">
 					<view class="ques-top-body">
 						<text class="ques-type">{{ fmtQuestionType }}</text>
@@ -72,7 +73,7 @@
 					/>
 				</view>
 			</view>
-			<view class="submit-store">
+			<view class="submit-store" :style="answerGuideIndex === 3 ? 'z-index: 101' : 'z-index: 10'">
 				<button @click="submitTopic" class="submit-topic">上交</button>
 				<button @click="storeTopic" class="store-submit">暂存</button>
 			</view>
@@ -81,6 +82,16 @@
 		<view v-if="showExitBtn" class="exit">
 			<navigator class="exitBtn" open-type="exit" target="miniProgram">退出答题</navigator>
 		</view>
+		<auth-login
+			:account='account'
+			:needLogin='needLogin'
+			v-on:authLoginSuccess='authLoginSuccess'
+		/>
+		<answer-guide
+			:showAnswerGuide='showAnswerGuide'
+			v-on:answerGuideChangeStep='answerGuideChangeStep'
+			v-on:hideAnswerGuide='hideAnswerGuide'
+		/>
 	</view>
 </template>
 
@@ -89,6 +100,8 @@ import ClassTopBaseInfo from '../../components/ClassTopBaseInfo/ClassTopBaseInfo
 import CustomAudio from '../../components/CustomAudio/CustomAudio';
 import RecorderPanel from '../../components/RecorderPanel/RecorderPanel'
 import TopicBody from '../../components/TopicBody/TopicBody'
+import AuthLogin from '../../components/AuthLogin/AuthLogin'
+import AnswerGuide from '../../components/CustomGuide/AnswerGuide'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
@@ -101,6 +114,8 @@ export default {
 		RecorderPanel,
 		TopicBody,
 		DefaultAnswerPageView,
+		AuthLogin,
+		AnswerGuide,
 	},
 	data() {
 		return {
@@ -134,7 +149,11 @@ export default {
 			countdownTimer: 0, // 考试剩余时间计时器
 			storeFlag: false, // 暂存标识
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
-			isAnswering: null,
+			isAnswering: null, // true: 表明已经在其他终端开始作答，本终端不能上交； false: 在本终端开启作答，可以在本终端上交
+			account: null, // 用户的账户
+			needLogin: false, // 是否需要先进行用户认证
+			showAnswerGuide: false, // 是否显示答题引导,
+			answerGuideIndex: -1 // 当前引导的步骤
 		}
 	},
 	computed: {
@@ -203,24 +222,17 @@ export default {
 		}
 	},
 	onLoad(options) {
-    const query = wx.createSelectorQuery()
-    query.select('.viewAll').fields({
-      dataset: true,
-      rect: true,
-      size: true,
-      scrollOffset: true,
-      computedStyle: ['margin', 'backgroundColor'],
-      context: true,
-    }, (res) => {
-      console.log('createSelectorQuery', res)
-    }).exec()
+		// 判断是否是第一次打开
+		if (uni.getStorageSync('answerGuide') === '') {
+			this.startAnswerGuide()
+		}
 		uni.setKeepScreenOn({
 			keepScreenOn: true
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		const url = 'https://test.xiaocongkj.com/?token=c5b5655e3f1f4e7f936c2bd0e6893ba6&key=U_E_17_11952&userId=11952&studentId=11984&examId=2622&examRecordDataId=2642&mainNum=1&className=0716做题1班&courseName=0716教研一&currentLessonNumber=第4课次&clsId=5066&isAnswering=true'
-		// const url = decodeURIComponent(options.q)
+		// const url = 'https://test.xiaocongkj.com/?token=2268d1821df4434ab8b2ca742481dc38&key=U_E_17_11952&userId=11952&studentId=11984&examId=1214&mainNum=1&className=1126三班&courseName=1125教研二&currentLessonNumber=第1课次&clsId=4097&isAnswering=false&account=15911111121'
+		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const getParams = (url) => {
@@ -282,6 +294,10 @@ export default {
 			this.isAnswering = isAnswering
 			header.key = key
 			header.token = token
+			if (isAnswering === 'false' && 'account' in p) {
+				this.account = p.account
+				this.needLogin = true
+			}
 			startExam(this.examId, this.userId).then((res) => {
 				console.log('startExam', res)
 				if (res.code === "E_K12-OE_M2001") {
@@ -358,6 +374,18 @@ export default {
 		if(this.examId !== 0) {
 			this.updateQuestionList()
 		}
+	},
+	onReady() {
+		const query = wx.createSelectorQuery()
+    query.select('.showOrHide').fields({
+      dataset: true,
+      rect: true,
+      size: true,
+      // computedStyle: ['ZIndex'],
+      context: true,
+    }, (res) => {
+      console.log('createSelectorQuery', res)
+    }).exec()
 	},
   beforeDestroy() {
 		clearInterval(this.timer)
@@ -535,6 +563,17 @@ export default {
             that.endExamAction()
           }
           if (res.cancel) {
+						uni.showModal({
+							title: '提示',
+							content: '是否需要查看操作指引？',
+							confirmText: '需要',
+							cancelText: '不需要',
+              success(resp) {
+                if (resp.confirm) {
+                  that.startAnswerGuide()
+                }
+              }
+						})
 						console.log(that.submitFlag)
             if (that.submitFlag === 1) {
             	that.submitFlag = -1
@@ -547,6 +586,21 @@ export default {
           }
         }
 			})
+		},
+		authLoginSuccess() {
+			this.needLogin = false
+		},
+		startAnswerGuide() {
+			this.showAnswerGuide = true
+			this.answerGuideChangeStep(0)
+		},
+		answerGuideChangeStep(index) {
+			this.answerGuideIndex = index
+		},
+		hideAnswerGuide() {
+			this.answerGuideIndex = -1
+			this.showAnswerGuide = false
+			uni.setStorageSync('answerGuide', '1')
 		}
 	}
 }
@@ -651,6 +705,8 @@ export default {
 		}
 	}
 	.topic-list {
+		position: relative;
+		z-index: 0;
 		box-shadow: 0px 0px 10px 0px rgba(220,228,246,1);
 		width: 90vw;
 		margin: 2vw 5vw 15vh 5vw;
@@ -697,7 +753,7 @@ export default {
 				}
 				.selected-option {
 					color: #FFF;
-					background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
+					background: $default-bluelinearbg;
 				}
 				.fill-topic-img {
 					border-radius: 2vw;
@@ -736,7 +792,7 @@ export default {
 				background-size: 100% 100%;
 			}
 			.upToCorrect {
-				background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
+				background: $default-bluelinearbg;
 			}
 			.upToError {
 				background:linear-gradient(180deg,rgba(255,143,140,1) 0%,rgba(255,111,119,1) 100%);
@@ -765,7 +821,7 @@ export default {
 			background:linear-gradient(180deg,rgba(215,222,241,1) 0%,rgba(193,205,229,1) 100%);
 		}
 		.submit-topic {
-			background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
+			background: $default-bluelinearbg;
 		}
 	}
 }
@@ -784,7 +840,7 @@ export default {
     color: #FFF;
     padding: 2vw 10vw;
     border-radius: 8vw;
-    background:linear-gradient(180deg,rgba(123,191,255,1) 0%,rgba(112,166,255,1) 100%);
+    background: $default-bluelinearbg;
   }
 }
 </style>

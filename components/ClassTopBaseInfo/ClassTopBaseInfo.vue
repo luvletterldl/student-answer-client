@@ -1,11 +1,14 @@
 <template>
   <view class="topBaseInfo" :style="answerGuideIndex === 0 ? 'z-index: 101' : 'z-index: 0'">
     <view class='lessonName'>
-      <text class="lessonNumber">{{ currentLessonNumber }}</text>
-      <text class="courseName">{{ courseName }}</text>
+      <!-- <text class="lessonNumber">{{ currentLessonNumber }}</text>
+      <text class="courseName">{{ courseName }}</text> -->
+      <view class='clsName'>{{ className }}</view>
       <img @click="showOrHideCCName" class="showOrHide" :class="showCCName ? '' : 'hideStatus'" src="../../static/images/icon_answerSOH.png" />
     </view>
-    <view v-show="showCCName" class='clsName'>{{ className }}</view>
+    <!-- <view v-show="showCCName" class='clsName'>{{ className }}</view> -->
+    <view v-show="showCCName" class='lessonNumber'>{{ currentLessonNumber === 'undefined' ? '' : currentLessonNumber }}</view>
+    <view v-show="showCCName" class='courseName'>{{ courseName === 'undefined' ? '' : courseName }}</view>
   </view>
 </template>
 
@@ -20,10 +23,12 @@ export default {
     courseName: {
       type: String,
       required: true,
+      default: ''
     },
     currentLessonNumber: {
       type: String,
-      required: true
+      required: true,
+      default: ''
     },
     answerGuideIndex: {
       type: Number,
@@ -62,14 +67,6 @@ export default {
     flex-flow: row;
     justify-content: space-between;
     align-items: center;
-    .lessonNumber {
-      background: linear-gradient(180deg,#FED57B 0%,#FEB039 100%);
-      border-radius: 2vw;
-      font-size: 3vw;
-      padding: 1.5vw 2vw;
-      box-shadow: 0 1vw 1.5vw rgba(254,213,123, .5);
-      max-width: 20vw;
-    }
     .courseName {
       font-size: 3.6vw;
       font-weight: normal;
@@ -84,10 +81,17 @@ export default {
       transform: rotate(-90deg);
     }
   }
+  .lessonNumber {
+    background: linear-gradient(180deg,#FED57B 0%,#FEB039 100%);
+    border-radius: 2vw;
+    font-size: 3vw;
+    padding: 1.5vw 2vw;
+    margin: 1.5vw 0;
+    box-shadow: 0 1vw 1.5vw rgba(254,213,123, .5);
+  }
   .clsName {
     font-size: 4.6vw;
     font-weight: 600;
-    margin: 1.5vw 0;
   }
 }
 </style>

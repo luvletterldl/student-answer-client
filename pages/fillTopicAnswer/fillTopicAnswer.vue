@@ -31,7 +31,6 @@ export default {
 			index: 0,
 			paintX: 0,
 			paintY: 0,
-			classId: 0,
 			studentId: 0,
 			examId: 0,
 			time: 0,
@@ -43,7 +42,6 @@ export default {
 		this.order = Number(options.order)
 		this.userId = Number(options.userId)
 		this.index = Number(options.index)
-		this.classId = Number(options.classId)
 		this.studentId = Number(options.studentId)
 		this.examId = Number(options.examId)
 		this.time = Number(options.time)
@@ -102,7 +100,7 @@ export default {
         console.log('first', res[1].tempFilePath)
         const tempFilePath = res[1].tempFilePath
         this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, 400)
-        uploadImageToAliOss(this.classId, this.examId, tempFilePath).then((res) => {
+        uploadImageToAliOss(this.examId, tempFilePath).then((res) => {
 					console.log('uploadImageToAliOss', res)
 					// const questionLength = 
 					const urls = this.urls
@@ -118,6 +116,8 @@ export default {
 							studentAnswer: urls.toString().replace(/,/g, ''),
 							time: this.time,
 						}]).then(() => {
+							getApp().globalData.currentFillAnswer.order = this.order
+							getApp().globalData.currentFillAnswer.studentAnswer = urls.toString().replace(/,/g, '')
 							this.back()
 						})
 					})

@@ -7,7 +7,7 @@
 			:currentLessonNumber='currentLessonNumber'
 		/>
 		<view class="answer-panel">
-			<view class="topic-switch" :style="answerGuideIndex === 1 ? 'z-index: 101' : 'z-index: 0'">
+			<view class="topic-switch" :style="answerGuideIndex === 1 ? 'z-index: 101' : 'z-index: 2'">
 				<image @click='switchTopic(false)' src='../../static/images/icon_prevTopic.png' class='switcher' />
 				<view class='topicProcess'>
 					<view class='process'>
@@ -42,7 +42,6 @@
 							:questionIndex='index'
 							:question='ques'
 							v-on:updateQuestionList='updateQuestionList'
-							:clsId='clsId'
 							:examId='examId'
 							:examRecordDataId='examRecordDataId'
 							:userId='userId'
@@ -60,7 +59,6 @@
 						:question='currentTopic'
 						:questionIndex="currentTopicIndex"
 						v-on:updateQuestionList='updateQuestionList'
-						:clsId='clsId'
 						:examId='examId'
 						:examRecordDataId='examRecordDataId'
 						:userId='userId'
@@ -106,7 +104,7 @@ import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/Defaul
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, uploadImageToAliOss, examSubmit, currentServerTime, endExam, examHeartbeat, header } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam } from '../../lib/Api'
 export default {
 	components: {
 		ClassTopBaseInfo,
@@ -122,7 +120,6 @@ export default {
 			showDefaultView: true, // 占位组件
 			showExitBtn: false, // 答题完毕后退出小程序
 			userId: 0,
-			clsId: 0,
 			courseId: 0,
 			lessonId: 0,
 			id: 0,
@@ -134,7 +131,6 @@ export default {
 			currentLessonNumber: '',
 			showAnswerPanel: false, // 展示答题面板
 			showTopicTab: false, // 展示题目Tab
-			// order: 0, // 题目order
 			assignmentInfo: {}, 
 			questionList: [], // 题目列表
 			currentTopicIndex: 0, // 当前题目索引
@@ -151,6 +147,7 @@ export default {
 			storeFlag: false, // 暂存标识
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
 			isAnswering: null, // true: 表明已经在其他终端开始作答，本终端不能上交； false: 在本终端开启作答，可以在本终端上交
+			restart: null, // 是否是重刷
 			account: null, // 用户的账户
 			needLogin: false, // 是否需要先进行用户认证
 			showAnswerGuide: false, // 是否显示答题引导,
@@ -158,6 +155,7 @@ export default {
 		}
 	},
 	computed: {
+		// 当前题目
 		currentTopic() {
 			if (this.questionList === null || this.questionList === [] || this.questionList === undefined) {
 				return ''
@@ -165,14 +163,17 @@ export default {
 				return this.questionList.length > 0 ? this.questionList[this.currentTopicIndex] : ''
 			}
 		},
+		// 题目类型
 		fmtQuestionType() {
 		 	return formatQuestionType(this.currentTopic)
 		},
+		// 当前题目耗时
 		currentTopicTimeCost() {
 			return this.fmtSecToMin(this.timeLimitList[this.currentTopicIndex])
 		}
 	},
 	watch: {
+		// 如果是套题 需要把submitFlag数组元素全部重置为-1
 		currentTopicIndex: {
 			handler(newIndex, oldIndex) {
 				if (this.questionList.length > 0) {
@@ -197,6 +198,7 @@ export default {
 				}
 			}
 		},
+		// 如果全部提交成功就交卷
 		submitFlag: {
 			handler(newFlag, oldFlag) {
 				if (typeof newFlag === 'number' && newFlag === 1) {
@@ -210,6 +212,7 @@ export default {
 			},
 			deep: true
 		},
+		// 如果有总限时的话到时自动交卷
 		durationSeconds: {
 			handler(newSec, oldSec) {
 				console.log('durationSeconds', newSec, oldSec)
@@ -224,16 +227,18 @@ export default {
 		}
 	},
 	onLoad(options) {
-		// 判断是否是第一次打开
+		// 判断是否是第一次使用
 		if (uni.getStorageSync('answerGuide') === '') {
 			this.startAnswerGuide()
 		}
+		// 保持屏幕常亮
 		uni.setKeepScreenOn({
 			keepScreenOn: true
 		})
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
-		// const url = 'https://test.xiaocongkj.com/?token=7a7fb7a6de4a4d5387fb3157625583a7&key=U_S_17_11923&userId=11923&studentId=11954&examId=2303&mainNum=1&className=0616二班&courseName=0616教研一&currentLessonNumber=1.2&clsId=4958&isAnswering=false&account=15911111101'
+		// 调试时打开这句注释下句
+		// const url = 'https://test.xiaocongkj.com/?token=e735a20fa39d42c3be409db1db5a6a65&key=U_E_17_11935&userId=11935&studentId=11966&examId=2642&mainNum=1&className=0723线上考试2&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=15911111112'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -272,23 +277,19 @@ export default {
 			'className' in p &&
 			'courseName' in p &&
 			'currentLessonNumber' in p &&
-			'clsId' in p &&
 			'examId' in p &&
 			// 'examRecordDataId' in p &&
 			'studentId' in p &&
 			'userId' in p &&
-			'isAnswering' in p
+			'isAnswering' in p &&
+			'source' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, currentLessonNumber, courseName, clsId, examId, studentId, userId, isAnswering } = p
-			// this.token = token
-			// this.key = key
-			// this.mainNum = Number(mainNum)
+			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source } = p
 			this.currentTopicIndex = Number(mainNum) - 1
 			this.className = className
 			this.courseName = courseName
 			this.currentLessonNumber = currentLessonNumber
-			this.clsId = Number(clsId)
 			this.examId = Number(examId)
 			// this.examRecordDataId = Number(examRecordDataId)
 			this.studentId = Number(studentId)
@@ -296,107 +297,71 @@ export default {
 			this.isAnswering = isAnswering
 			header.key = key
 			header.token = token
+			getApp().globalData.source = source // 全局指定题目来源
+			if ('restart' in p && p.restart === 'true') {
+				this.restart = true
+			}
 			if (isAnswering === 'false' && 'account' in p) {
 				this.account = p.account
 				this.needLogin = true
+			} else {
+				this.initExam()
 			}
-			startExam(this.examId, this.userId).then((res) => {
-				console.log('startExam', res)
-				if (res.code === "E_K12-OE_M2001") {
-					uni.showToast({
-						title: res.desc,
-						icon: 'none'
-					})
-					this.showExitBtn = true
-				} else {
-					this.examRecordDataId = res.examRecordDataId
-					this.duration = res.duration
-					if (res.duration !== null) {
-						this.durationSeconds = res.duration * 60
-						this.countdownTimer = setInterval(() => {
-							this.durationSeconds -= 1
-							const remineTime = formatSecondToHHmmss(this.durationSeconds)
-							this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
-						}, 1000)
-					}
-					this.updateQuestionList().then(() => {
-						this.timeLimitList = new Array(this.questionList.length).fill(0)
-						this.timer = setInterval(() => {
-							const newTime = this.timeLimitList[this.currentTopicIndex] + 1
-							this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
-						}, 1000)
-					})
-				}
-			})
 		} else {
 			this.showDefaultView = true
 		}
-		// if (uni.getStorageSync(Main.userInfo) !== '') {
-		// 	const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
-		// 	this.userId = userInfo.userId
-		// }
-		// const mainNum = Number(options.mainNum)
-		// this.clsId = clsId
-		// this.courseId = courseId
-		// this.lessonId = lessonId
-		// this.id = id
-		// this.studentId = studentId
-		// this.examRecordDataId = ecExamRecordId
-		// this.showAnswerPanel = true
-		// console.log(JSON.parse(options.data))
-		// findClsAndCourseByClassIdAndCourseId(clsId, courseId, 4, id).then((res) => {
-		// 	console.log('res', res)
-		// 	const { className, courseName, currentLessonNumber } = res
-		// 	this.className = className
-		// 	this.courseName = courseName
-		// 	this.currentLessonNumber = currentLessonNumber
-		// })
-		// pageAssignment(this.clsId, this.lessonId, '待完成', this.studentId, 0, 5).then((res) => {
-		// 	console.log('pageAssignment', res)
-		// 	this.assignmentInfo = res.list[0]
-		// 	console.log(this.assignmentInfo)
-		// 	const courseId = this.assignmentInfo.courseId;
-		// 	const classId = this.assignmentInfo.classId;
-		// 	const examId = this.assignmentInfo.ecExamId;
-		// 	this.examId = examId
-		// 	const id = this.assignmentInfo.id;
-		// 	const ecExamRecordId = this.assignmentInfo.ecExamRecordId;
-		// 	startExam(examId, this.userId).then(() => {
-		// 		this.updateQuestionList().then(() => {
-		// 			this.timeLimitList = new Array(this.questionList.length).fill(0)
-		// 			this.timer = setInterval(() => {
-		// 				const newTime = this.timeLimitList[this.currentTopicIndex] + 1
-		// 				this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
-		// 			}, 1000)
-		// 		})
-		// 		// findExamQuestionList(examId, this.userId).then((res) => {
-		// 		// 	console.log('findExamQuestionList', res)
-		// 		// })
-		// 	})
-		// })
 	},
 	onShow() {
-		if(this.examId !== 0) {
-			this.updateQuestionList()
+		const currentFillAnswer = getApp().globalData.currentFillAnswer
+		if (currentFillAnswer.order !== 0) {
+			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
+			this.updateQuestionList(params)
 		}
-	},
-	onReady() {
-		const query = wx.createSelectorQuery()
-    query.select('.showOrHide').fields({
-      dataset: true,
-      rect: true,
-      size: true,
-      // computedStyle: ['ZIndex'],
-      context: true,
-    }, (res) => {
-      console.log('createSelectorQuery', res)
-    }).exec()
 	},
   beforeDestroy() {
 		clearInterval(this.timer)
 		clearInterval(this.countdownTimer)
   },
 	methods: {
+		initExam(){
+			if (this.restart === true) {
+				restartExam(this.examId, this.userId).then((res) => {
+					this.startOrRestartExamCallback(res)
+				})
+			} else {
+				startExam(this.examId, this.userId).then((res) => {
+					this.startOrRestartExamCallback(res)
+				})
+			}
+		},
+		startOrRestartExamCallback(res) {
+			console.log('startExam', res)
+			if (res.code === "E_K12-OE_M2001") {
+				uni.showToast({
+					title: res.desc,
+					icon: 'none'
+				})
+				this.showExitBtn = true
+			} else {
+				this.examRecordDataId = res.examRecordDataId
+				this.duration = res.duration
+				if (res.duration !== null) {
+					this.durationSeconds = res.duration * 60
+					this.countdownTimer = setInterval(() => {
+						this.durationSeconds -= 1
+						const remineTime = formatSecondToHHmmss(this.durationSeconds)
+						this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
+					}, 1000)
+				}
+				this.updateQuestionList().then(() => {
+					this.timeLimitList = new Array(this.questionList.length).fill(0)
+					this.timer = setInterval(() => {
+						const newTime = this.timeLimitList[this.currentTopicIndex] + 1
+						this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+					}, 1000)
+				})
+			}
+		},
 		updateQuestionList(params) {
 			console.log('updateQuestionList params', params)
 			if (params) {
@@ -424,6 +389,7 @@ export default {
 						}
 					}
 				})
+				getApp().globalData.currentFillAnswer.order = 0 // 刷新questionList后重置currentFillAnswer
 				// this.questionList = questionList
 				console.log('questionList', questionList)
 			} else {
@@ -600,8 +566,10 @@ export default {
         }
 			})
 		},
+		// 用户认证成功回调
 		authLoginSuccess() {
 			this.needLogin = false
+			this.initExam()
 		},
 		startAnswerGuide() {
 			this.showAnswerGuide = true
@@ -844,7 +812,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 100;
+  z-index: 201;
   background: rgba(0,0,0, .3);
   display: flex;
   align-items: center;

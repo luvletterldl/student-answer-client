@@ -80,10 +80,10 @@ export default {
       type: Function,
       reuqired: true
     },
-    clsId: {
-      type: Number,
-      reuqired: true,
-    },
+    // clsId: {
+    //   type: Number,
+    //   reuqired: true,
+    // },
     examId: {
       type: Number,
       reuqired: true,
@@ -366,7 +366,7 @@ export default {
 		},
     toFillAnswer(urls, index) {
 			uni.navigateTo({
-			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${this.question.order}&classId=${this.clsId}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${this.time}&urls=${JSON.stringify(urls)}`
+			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${this.question.order}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${this.time}&urls=${JSON.stringify(urls)}`
 			})
     },
     fmtFillAnswer(question) {
@@ -405,8 +405,8 @@ export default {
             title: '上传中...',
           })
 					const filePath = res[1].tempFilePaths[0]
-					console.log(res, this.clsId, this.examId, filePath)
-          uploadImageToAliOss(this.clsId, this.examId, filePath).then((resp) => {
+					console.log(res, this.examId, filePath)
+          uploadImageToAliOss(this.examId, filePath).then((resp) => {
             uni.hideLoading()
             uni.showLoading({ title: '提交中...' })
 						console.log('uploadImageToAliOss', resp, question)

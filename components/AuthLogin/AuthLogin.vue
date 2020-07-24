@@ -10,7 +10,7 @@
 </template>
 
 <script>
-import { clientLogin } from '../../lib/Api'
+import { clientLogin, header } from '../../lib/Api'
 export default {
   name: 'AuthLogin',
   props: {
@@ -55,6 +55,10 @@ export default {
             })
             return
           } else {
+            // 如果是OE还是用二维码中的token
+            if (getApp().globalData.source === 'OA') {
+              header.token = res.user.token
+            }
             this.$emit('authLoginSuccess')
           }
         })

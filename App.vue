@@ -5,6 +5,11 @@ export default {
 		// 保证全局只有一个音频处于播放状态且录音与播放操作互斥
 		audioPlaying: false,
 		audioRecording: false,
+		currentFillAnswer: { // 当前填空题
+			order: 0,
+			studentAnswer: ''
+		},
+		source: '', // 题目来源 OA: 公众号 OE：PC网考
 	},  
 	onLaunch: function() {
 		console.log('App Launch');

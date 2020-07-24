@@ -80,10 +80,6 @@ export default {
       type: Function,
       reuqired: true
     },
-    // clsId: {
-    //   type: Number,
-    //   reuqired: true,
-    // },
     examId: {
       type: Number,
       reuqired: true,
@@ -138,13 +134,15 @@ export default {
       spokenResult: undefined,
       oldTime: 0,
       oldSelectedOpts: [],
+      isNestedAnswer: null,
     }
   },
   watch: {
     question: {
       handler(newQues, oldQues) {
         console.log('watchQuestion handler', newQues, oldQues)
-        if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1) {
+        // 防止因为提交 或者套题中提交答案导致无限刷的死循环
+        if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1 && this.isNestedAnswer === false) {
           if (oldQues) {
             console.log('oldQues', oldQues, 'oldQues.questionType', oldQues.questionType)
             if (oldQues.questionType === QuestionType.SINGLE_ANSWER_QUESTION || oldQues.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
@@ -178,25 +176,37 @@ export default {
         this.oldTime = oldTime
       }
     },
-    // storeFlag: {
-    //   handler(newFlag, oldFlag) {
-    //     if (newFlag === true) {
-    //       const type = this.question.questionType
-    //       if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-    //           this.submitChoiceAnswer(this.question)
-    //         } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-    //           this.submitBoolAnswer(this.question)
-    //         }
-    //       if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
-    //         uni.showToast({
-    //           title: '暂存成功',
-    //           icon: 'success'
-    //         })
-    //         this.$emit('storedTopic')
-    //       }
-    //     }
-    //   }
-    // },
+    subQuesIndex: {
+      handler(newIndex, oldIndex) {
+        if (newIndex !== undefined && newIndex !== 0) {
+          this.isNestedAnswer = true
+        } else {
+          this.isNestedAnswer = false
+        }
+      },
+      immediate: true
+    },
+    /*
+    storeFlag: {
+      handler(newFlag, oldFlag) {
+        if (newFlag === true) {
+          const type = this.question.questionType
+          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+            this.submitChoiceAnswer(this.question)
+            } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+              this.submitBoolAnswer(this.question)
+            }
+          if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
+            uni.showToast({
+              title: '暂存成功',
+              icon: 'success'
+            })
+            this.$emit('storedTopic')
+          }
+        }
+      }
+    },
+    */
     submitFlag: {
       handler(newFlag, oldFlag) {
         if (newFlag === 0) {
@@ -258,11 +268,15 @@ export default {
     this.rm.onError((e) => this.onError(e))
   },
   // beforeUpdate() {
-  //   console.log('beforeUpdate', this.question, this.question.questionType)
+  //   console.log('beforeUpdate', this.question.questionType, this.subQuesIndex, this.isNestedAnswer)
   // },
   // updated() {
   //   console.log('updated', this.question, this.question.questionType)
   // },
+  onHide() {
+    console.log('onHide',)
+    this.submitTopicWhenBoolOrChoice()
+  },
   beforeDestroy() {
     console.log('beforeDestroy', this.question, this.question.questionType, this.oldBoolStudentAnswer, this.oldSelectedOpts)
     this.submitTopicWhenBoolOrChoice()
@@ -344,11 +358,19 @@ export default {
         }
       }
       this.oldSelectedOpts = this.selectedOptions
+      // 如果是套题中的第一小题之后的题，点击选项就提交
+      if (this.isNestedAnswer === true && JSON.stringify(this.selectedOptions) !== JSON.stringify(this.question.studentAnswer)) {
+        this.submitChoiceAnswer(this.question)
+      }
       console.log(this.selectedOptions, this.oldSelectedOpts)
     },
     selectBoolAnswer(bool) {
 			this.boolStudentAnswer = bool
       this.oldBoolStudentAnswer = bool
+      // 如果是套题中的第一小题之后的题，更改对或错就提交
+      if (this.isNestedAnswer === true && this.boolStudentAnswer.toString() !== this.question.studentAnswer) {
+        this.submitBoolAnswer(this.question)
+      }
       console.log(bool, this.boolStudentAnswer, this.oldBoolStudentAnswer)
     },
     trueOrFalse() {
@@ -385,13 +407,6 @@ export default {
         arrList.forEach((v, i) => {
           answerList[i] = answerList[i] || v
         })
-        // answerList = Array.from(answerList)
-        // answerList.forEach((v, i) => {
-        //   console.log(v)
-        //   if (v === undefined) {
-        //     answerList[i] === ''
-        //   }
-        // })
         return answerList
       }
     },

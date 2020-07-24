@@ -28,7 +28,8 @@
     {
       "path" : "pages/fillTopicAnswer/fillTopicAnswer",
       "style" : {
-        "navigationBarTitleText": "答题"
+        "navigationBarTitleText": "答题",
+        "disableScroll": true
       }
     },
     {

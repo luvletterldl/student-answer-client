@@ -160,6 +160,8 @@ export default {
 			if (this.questionList === null || this.questionList === [] || this.questionList === undefined) {
 				return ''
 			} else {
+				// 改变全局变量中的当前题目类型
+				getApp().globalData.currentQuestionType = this.questionList.length > 0 ? this.questionList[this.currentTopicIndex].questionType : ''
 				return this.questionList.length > 0 ? this.questionList[this.currentTopicIndex] : ''
 			}
 		},
@@ -238,7 +240,7 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=e735a20fa39d42c3be409db1db5a6a65&key=U_E_17_11935&userId=11935&studentId=11966&examId=2642&mainNum=1&className=0723线上考试2&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=15911111112'
+		// const url = 'https://test.xiaocongkj.com/?token=cc34aa15df89459d97c8f861034c434a&key=U_S_17_12407&userId=12407&studentId=12439&examId=2613&mainNum=1&className=口语题&courseName=答题迁移&currentLessonNumber=第二课次--口语题&isAnswering=false&account=13412345683&source=OA'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)

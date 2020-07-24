@@ -9,6 +9,7 @@ export default {
 			order: 0,
 			studentAnswer: ''
 		},
+		currentQuestionType: '',
 		source: '', // 题目来源 OA: 公众号 OE：PC网考
 	},  
 	onLaunch: function() {

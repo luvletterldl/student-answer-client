@@ -110,18 +110,23 @@ export default {
       }
     },
     onTimeUpdate(e) {
-      // console.log('onTimeUpdate', this.audioCtx.duration, this.audioCtx.currentTime)
+      console.log('onTimeUpdate', this.audioCtx.duration, this.audioCtx.currentTime)
+      // this.audioImg = iconPlaying
       if (this.audioCtx.currentTime > 0 && this.audioCtx.currentTime <= 1) {
         this.currentTime = 1
       } else if (this.currentTime !== Math.floor(this.audioCtx.currentTime)) {
         this.currentTime = Math.floor(this.audioCtx.currentTime)
+      }
+      const duration = Math.floor(this.audioCtx.duration)
+      if (this.duration !== duration) {
+        this.duration = duration
       }
     },
     onCanplay(e) {
       if (this.audioImg === iconLoading) {
         this.audioImg = iconPaused
       }
-      // console.log('onCanplay', e)
+      console.log('onCanplay', e)
     },
     onWaiting(e) {
       if (this.audioImg !== iconLoading) {
@@ -130,7 +135,7 @@ export default {
     },
     onPlay(e) {
       console.log('onPlay', e, this.audioCtx.duration)
-      // this.audioImg = iconPlaying
+      this.audioImg = iconPlaying
       if (this.audioCtx.duration > 0 && this.audioCtx.duration <= 1) {
         this.duration = 1
       } else {
@@ -139,7 +144,7 @@ export default {
     },
     onPause(e) {
       console.log('onPause', e)
-      // this.audioImg = iconPaused
+      this.audioImg = iconPaused
     },
     onEnded(e) {
       console.log('onEnded', e)
@@ -170,7 +175,7 @@ export default {
   background: $default-bgcolor;
   color: #333;
   display: flex;
-  flex-flow: row no-wrap;
+  flex-flow: row nowrap;
   align-items: center;
   justify-content: space-between;
   padding: 2vw;

@@ -49,7 +49,7 @@
 							:time='timeLimitList[currentTopicIndex]'
 							:storeFlag='storeFlag'
 							v-on:storedTopic='storedTopic'
-							:submitFlag='submitFlag[index]'
+							:submitFlag='submitFlag'
 							v-on:updateSubmitFlag='updateSubmitFlag'
 						/>
 					</view>
@@ -179,24 +179,24 @@ export default {
 		currentTopicIndex: {
 			handler(newIndex, oldIndex) {
 				if (this.questionList.length > 0) {
-					if (this.questionList[newIndex].hasSub) {
-						const subQuestions = this.questionList[newIndex].subQuestions
-						const submitFlag = []
-						subQuestions.forEach((ques, i) => {
-							const type = ques.questionType
-							if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
-								submitFlag.push(-1)
-							}
-						})
-						this.submitFlag = submitFlag
-						if (submitFlag.length === 0) {
-							this.submitFlag = true
-						}
-						console.log('submitFlag', this.submitFlag)
-					} else {
-						this.submitFlag = -1
-						console.log('submitFlag', this.submitFlag)
-					}
+					// if (this.questionList[newIndex].hasSub) {
+					// 	const subQuestions = this.questionList[newIndex].subQuestions
+					// 	const submitFlag = []
+					// 	subQuestions.forEach((ques, i) => {
+					// 		const type = ques.questionType
+					// 		if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
+					// 			submitFlag.push(-1)
+					// 		}
+					// 	})
+					// 	this.submitFlag = submitFlag
+					// 	if (submitFlag.length === 0) {
+					// 		this.submitFlag = true
+					// 	}
+					// 	console.log('submitFlag', this.submitFlag)
+					// } else {
+					// }
+					this.submitFlag = -1
+					console.log('submitFlag', this.submitFlag)
 				}
 			}
 		},
@@ -207,12 +207,7 @@ export default {
 					console.log('watch submitFlag number', newFlag)
 					this.submitTopicAction()
 				}
-				if (typeof newFlag === 'object' && newFlag.findIndex((v) => { return v === 0 || v === -1 }) === -1) {
-					console.log('watch submitFlag object', newFlag)
-					this.submitTopicAction()
-				}
-			},
-			deep: true
+			}
 		},
 		// 如果有总限时的话到时自动交卷
 		durationSeconds: {
@@ -240,7 +235,7 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=cc34aa15df89459d97c8f861034c434a&key=U_S_17_12407&userId=12407&studentId=12439&examId=2613&mainNum=1&className=口语题&courseName=答题迁移&currentLessonNumber=第二课次--口语题&isAnswering=false&account=13412345683&source=OA'
+		// const url = 'https://test.xiaocongkj.com/?token=fbc1180c2d5d4f68a7788631111d6bf3&key=U_S_17_12407&userId=12407&studentId=12439&examId=2613&mainNum=1&className=口语题&courseName=答题迁移&currentLessonNumber=第二课次--口语题&isAnswering=false&account=13412345683&source=OA'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -338,12 +333,11 @@ export default {
 		},
 		startOrRestartExamCallback(res) {
 			console.log('startExam', res)
-			if (res.code === "E_K12-OE_M2001") {
-				uni.showToast({
-					title: res.desc,
-					icon: 'none'
-				})
-				this.showExitBtn = true
+			if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
+				// uni.showToast({
+				// 	title: res.desc,
+				// 	icon: 'none'
+				// })
 			} else {
 				this.examRecordDataId = res.examRecordDataId
 				this.duration = res.duration
@@ -374,11 +368,13 @@ export default {
 						const subQuestions = ques.subQuestions
 						subQuestions.forEach((subQues, j, arr) => {
 							if (data.order === subQues.order) {
+								console.log(data, subQues)
 								subQuestions[j].studentAnswer = data.studentAnswer
 								if (subQuestions[j].questionType === QuestionType.SPOKEN_ANSWER_QUESTION) {
 									subQuestions[j].evaluation = data.evaluation
 								}
 								this.questionList.splice(i, 1, questionList[i])
+								console.log(this.questionList)
 							}
 						})
 					} else {
@@ -487,30 +483,27 @@ export default {
 			console.log('submitTopic', this.submitFlag)
 			if (this.submitFlag === -1) {
 				this.submitFlag = 0
-			} else if (typeof this.submitFlag === 'object') {
-				this.submitFlag = new Array(this.submitFlag.length).fill(0)
+			// } else if (typeof this.submitFlag === 'object') {
+			// 	this.submitFlag = new Array(this.submitFlag.length).fill(0)
 			// } else if (this.submitFlag === true) {
 			// 	this.submitTopicAction()
 			} else {
 				this.submitTopicAction()
 			}
 		},
-		submitedTopic() {
-			this.submitFlag = false
-		},
 		updateSubmitFlag(data) {
 			console.log('updateSubmitFlag', data, this.submitFlag)
-			if (data !== undefined && typeof this.submitFlag === 'object') {
-				this.submitFlag.splice(data, 1, 1)
-			} else if (this.submitFlag === 0) {
+			if (this.submitFlag === 0) {
 				this.submitFlag = 1
-			} else if (this.submitFlag === true) {
-				return
 			}
 		},
 		endExamAction() {
+			uni.showLoading({
+				title: '上交中...'
+			})
 			endExam(this.examId, this.userId).then((res) => {
-				if (res.code === 'M3001') {
+				uni.hideLoading()
+				if (res.code === 'E_K12-OE_M3001') {
 					uni.showToast({
 						title: res.desc,
 						icon: 'none'
@@ -526,8 +519,6 @@ export default {
 					this.showExitBtn = true
 					if (typeof this.submitFlag === 'number') {
 						this.submitFlag = -1
-					} else {
-						this.submitFlag = new Array(this.submitFlag.length).fill(-1)
 					}
 				}
 				console.log('endExam', res)
@@ -558,11 +549,6 @@ export default {
 						console.log(that.submitFlag)
             if (that.submitFlag === 1) {
             	that.submitFlag = -1
-            } else if (typeof that.submitFlag === 'object') {
-							that.submitFlag = new Array(that.submitFlag.length).fill(-1)
-							console.log('object', that.submitFlag)
-            } else if (that.submitFlag === true) {
-              return
             }
           }
         }

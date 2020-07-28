@@ -14,7 +14,7 @@
     </view>
     <view v-if="question.questionType === QuestionType.BOOL_ANSWER_QUESTION" class="true-false">
       <view @click='selectBoolAnswer(true, question)' class='correct' :class="trueOrFalse(question) === true ? 'upToCorrect' : ''">正确</view>
-      <view @click='selectBoolAnswer(false, question)' class='error' :class="trueOrFalse(question) === true ? '' : 'upToError'">错误</view>
+      <view @click='selectBoolAnswer(false, question)' class='error' :class="trueOrFalse(question) === false ? 'upToError' : ''">错误</view>
     </view>
     <view v-if="question.questionType === QuestionType.FILL_BLANK_QUESTION" class='fill-blank'>
       <view @click="toFillAnswer(fmtFillAnswer(question), index)" v-for="(item, index) in fmtFillAnswer(question)" :key="index" class="option">
@@ -110,7 +110,8 @@ export default {
     },
     submitFlag: {
       type: Number,
-      reuqired: true
+      reuqired: false,
+      default: -1
     },
     updateSubmitFlag: {
       type: Function,
@@ -140,10 +141,10 @@ export default {
   watch: {
     question: {
       handler(newQues, oldQues) {
-        console.log('watchQuestion handler', newQues, oldQues)
+        console.log('watchQuestion handler', newQues, oldQues, this.storeFlag, this.submitFlag, this.isNestedAnswer)
         // 防止因为提交 或者套题中提交答案导致无限刷的死循环
-        if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1 && this.isNestedAnswer === false) {
-          if (oldQues) {
+        if (!this.storeFlag && this.submitFlag !== 0 && this.submitFlag !== 1) {
+          if (oldQues && this.isNestedAnswer === null) {
             console.log('oldQues', oldQues, 'oldQues.questionType', oldQues.questionType)
             if (oldQues.questionType === QuestionType.SINGLE_ANSWER_QUESTION || oldQues.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
               this.submitChoiceAnswer(oldQues)
@@ -154,10 +155,12 @@ export default {
           if (newQues) {
             console.log('newQues', newQues, 'newQues.questionType', newQues.questionType)
             const type = newQues.questionType
-            const answer = newQues.studentAnswer || ''
+            const answer = newQues.studentAnswer
             if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-              if (answer !== '') {
+              if (answer !== '' && answer !== null && answer !== undefined) {
+                console.log('newQues aa', newQues, answer)
                 this.selectedOptions = Array.from(answer.replace(/,/g, ''), (v) => { return parseInt(v)})
+                console.log('newQues bb', this.selectedOptions)
               } else {
                 this.selectedOptions = []
               }
@@ -165,6 +168,8 @@ export default {
             if (type === QuestionType.BOOL_ANSWER_QUESTION) {
               this.boolStudentAnswer = answer === 'true' ? true : answer === 'false' ? false : null
             }
+          } else {
+            console.log('newQues false', newQues)
           }
         }
       },
@@ -178,35 +183,12 @@ export default {
     },
     subQuesIndex: {
       handler(newIndex, oldIndex) {
-        if (newIndex !== undefined && newIndex !== 0) {
+        if (newIndex !== undefined && newIndex !== 0 && newIndex !== '0') {
           this.isNestedAnswer = true
-        } else {
-          this.isNestedAnswer = false
         }
       },
       immediate: true
     },
-    /*
-    storeFlag: {
-      handler(newFlag, oldFlag) {
-        if (newFlag === true) {
-          const type = this.question.questionType
-          if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-            this.submitChoiceAnswer(this.question)
-            } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-              this.submitBoolAnswer(this.question)
-            }
-          if (type !== QuestionType.SINGLE_ANSWER_QUESTION || type !== QuestionType.MULTIPLE_ANSWER_QUESTION || type !== QuestionType.BOOL_ANSWER_QUESTION) {
-            uni.showToast({
-              title: '暂存成功',
-              icon: 'success'
-            })
-            this.$emit('storedTopic')
-          }
-        }
-      }
-    },
-    */
     submitFlag: {
       handler(newFlag, oldFlag) {
         if (newFlag === 0) {
@@ -229,7 +211,7 @@ export default {
       } else if (status === 1) {
         this.recordImg = iconRecording
       }
-      return status === 0 ? '点击开始录音' : status === 1 ? '录音中' : status === 2 ? '点击开始录音' : ''
+      return status === 0 ? '点击开始录音' : status === 1 ? '录音中，再次点击结束录音' : status === 2 ? '点击开始录音' : ''
     },
     evaluationAccuracy() {
       const result = this.question.evaluation
@@ -301,11 +283,16 @@ export default {
       this.isNeedUpdateSubmitFlag()
     },
     submitTopicWhenBoolOrChoice(){
-      const type = this.question.questionType
-      if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
-        this.submitChoiceAnswer(this.question)
-      } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
-        this.submitBoolAnswer(this.question)
+      // 如果是套题的非首子题 直接return
+      if (this.isNestedAnswer) {
+        return
+      } else {
+        const type = this.question.questionType
+        if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION) {
+          this.submitChoiceAnswer(this.question)
+        } else if (type === QuestionType.BOOL_ANSWER_QUESTION) {
+          this.submitBoolAnswer(this.question)
+        }
       }
     },
     submitChoiceAnswer(question) {
@@ -377,7 +364,9 @@ export default {
 			if (this.boolStudentAnswer !== null) {
 				return this.boolStudentAnswer
 			} else if (this.question.questionType === QuestionType.BOOL_ANSWER_QUESTION) {
-				if (this.question.studentAnswer === 'true') {
+        if (this.question.studentAnswer === null) {
+          return null
+        } else if (this.question.studentAnswer === 'true') {
 					return true
 				} else if (this.question.studentAnswer === 'false') {
 					return false

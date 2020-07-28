@@ -10,7 +10,7 @@
 </template>
 
 <script>
-import { clientLogin, header } from '../../lib/Api'
+import { clientOELogin, header } from '../../lib/Api'
 export default {
   name: 'AuthLogin',
   props: {
@@ -40,25 +40,26 @@ export default {
         })
         return
       } else {
-        clientLogin(this.account, this.password).then((res) => {
+        clientOELogin(this.account, this.password).then((res) => {
           console.log('clientLogin', res)
-          console.log(res)
-          const code = res.code
-          let title = ''
-          if (code === 'K-000012' || code === 'K-000011') {
-            title = res.desc
-          }
-          if (title !== '') {
-            uni.showToast({
-              title: title,
-              icon: 'none'
-            })
-            return
+          // console.log(res)
+          // const code = res.code
+          // let title = ''
+          // if (code === 'K-000012' || code === 'K-000011') {
+          //   title = res.desc
+          // }
+          if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
+          // }
+          // if (title !== '') {
+          //   uni.showToast({
+          //     title: title,
+          //     icon: 'none'
+          //   })
+          //   return
           } else {
             // 如果是OE还是用二维码中的token
-            if (getApp().globalData.source === 'OA') {
-              header.token = res.user.token
-            }
+            header.key = res.user.key
+            header.token = res.user.token
             this.$emit('authLoginSuccess')
           }
         })

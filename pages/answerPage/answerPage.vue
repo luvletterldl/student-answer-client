@@ -235,7 +235,7 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=fbc1180c2d5d4f68a7788631111d6bf3&key=U_S_17_12407&userId=12407&studentId=12439&examId=2613&mainNum=1&className=口语题&courseName=答题迁移&currentLessonNumber=第二课次--口语题&isAnswering=false&account=13412345683&source=OA'
+		// const url = 'https://test.xiaocongkj.com/?token=db6b31954baa442daac39c51f563489a&key=U_E_17_11923&userId=11923&studentId=11954&examId=2654&mainNum=1&className=0727一班&courseName=0727教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111101&source=OE'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)

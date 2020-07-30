@@ -50,9 +50,10 @@ export default {
   },
 	onReady(){
 		this.ctx = uni.createCanvasContext('canId')
-		if (this.urls[this.index] !== '') {
+		const answer = this.urls[this.index]
+		if (answer !== '' && (answer.indexOf('.png') !== -1 || answer.indexOf('.jpg') !== -1)) {
 			uni.getImageInfo({
-				src: `${imgPreUrl}${this.urls[this.index]}`
+				src: `${imgPreUrl}${answer}`
 			}).then((res) => {
 				console.log(res)
 				this.ctx.drawImage(res[1].path, 0, 0, windowWidth, 400)

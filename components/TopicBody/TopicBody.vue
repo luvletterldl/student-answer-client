@@ -20,31 +20,31 @@
       <view @click="toFillAnswer(fmtFillAnswer(question), index)" v-for="(item, index) in fmtFillAnswer(question)" :key="index" class="option">
         <view class="option-index">{{ index + 1 }}</view>
         <text v-if='item === ""'>点击输入</text>
-        <image v-else-if="item !== ''" :src='combineUrl(item)' class="fill-topic-img" />
+        <image v-else-if="isImage(item)" :src='combineUrl(item)' class="fill-topic-img" />
+        <view v-else-if="!isImage(item)" class="text-text">{{ fillAnswer[index] }}</view>
       </view>
     </view>
     <view v-if="question.questionType === QuestionType.TEXT_ANSWER_QUESTION" class="text-answer">
       <view @click="uploadTextAnswer(question)" v-if="question.studentAnswer === null || question.studentAnswer === ''" class="default-view">点击拍照上传</view>
-      <image mode='aspectFit' @click="uploadTextAnswer(question)" v-else :src="combineUrl(question.studentAnswer)" alt="">
+      <image mode='aspectFit' @click="uploadTextAnswer(question)" v-else-if="isImage(question.studentAnswer)" :src="combineUrl(question.studentAnswer)" alt="" />
+      <view v-else-if="!isImage(question.studentAnswer)" class="text-text" @click="uploadTextAnswer(question)">{{ question.studentAnswer }}</view>
     </view>
     <view v-if="question.questionType === QuestionType.SPOKEN_ANSWER_QUESTION" class="recorder-panel">
       <view class="record-part">
         <text>音频文本: {{ question.audioText }}</text>
-        <!-- <text class="record-desc">{{ recordDesc }}</text> -->
       </view>
       <view class="audio-evoluation">
         <view class="record-desc">{{ recordDesc }}</view>
         <view class="audio-text">
-            <!-- v-if="question.studentAnswer !== null && question.studentAnswer !== ''" -->
           <custom-audio
             class="custom-audio"
             :audioSrc='question.studentAnswer'
             :showTime="false"
           />
           <image @click="recordAction" :src="recordImg" class="record"/>
-          <text class="evaluationAccuracy">{{ evaluationAccuracy }}</text>
+          <text v-if="showSpokenAnswer === 1" class="evaluationAccuracy">{{ evaluationAccuracy }}</text>
         </view>
-        <view class="evoluation">
+        <view v-if="showSpokenAnswer === 1" class="evoluation">
           <rich-text class="words" :nodes="fmtRichTextImg(evaluationResult)" />
         </view>
       </view>
@@ -56,7 +56,7 @@
 import Main from '../../lib/Main'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
-import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam } from '../../lib/Api'
+import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam, findExamQuestionList } from '../../lib/Api'
 import { formatQuestionType, formatRichTextImg, beforeAudioRecordOrPlay, afterAudioRecord } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
@@ -116,6 +116,14 @@ export default {
     updateSubmitFlag: {
       type: Function,
       reuqired: true
+    },
+    showSpokenAnswer: {
+      type: Number,
+      reuqired: false,
+      default: 1
+    },
+    showExitBtnAction: {
+      type: Function
     }
   },
   components: {
@@ -201,6 +209,15 @@ export default {
     }
   },
   computed: {
+    fillAnswer() {
+      if (this.question.questionType === QuestionType.FILL_BLANK_QUESTION) {
+        if (this.question.studentAnswer === null) {
+          return ''
+        } else {
+          return this.question.studentAnswer.split('##')
+        }
+      }
+    },
     fmtQuestionType() {
 		 	return formatQuestionType(this.question)
 		},
@@ -211,7 +228,7 @@ export default {
       } else if (status === 1) {
         this.recordImg = iconRecording
       }
-      return status === 0 ? '点击开始录音' : status === 1 ? '录音中，再次点击结束录音' : status === 2 ? '点击开始录音' : ''
+      return status === 0 ? '点击录音按钮开始录音' : status === 1 ? '录音中，再次点击录音按钮结束录音' : status === 2 ? '点击录音按钮开始录音' : ''
     },
     evaluationAccuracy() {
       const result = this.question.evaluation
@@ -249,9 +266,12 @@ export default {
     this.rm.onInterruptionEnd((e) => this.onInterruptionEnd(e))
     this.rm.onError((e) => this.onError(e))
   },
-  // beforeUpdate() {
-  //   console.log('beforeUpdate', this.question.questionType, this.subQuesIndex, this.isNestedAnswer)
-  // },
+  beforeUpdate() {
+    // console.log('beforeUpdate', this.question.questionType, this.subQuesIndex, this.isNestedAnswer)
+    if (getApp().globalData.authStatus === false) {
+      this.$emit('showExitBtnAction')
+    }
+  },
   // updated() {
   //   console.log('updated', this.question, this.question.questionType)
   // },
@@ -266,7 +286,16 @@ export default {
   methods: {
     fmtRichTextImg(nodes) {
 			return formatRichTextImg(nodes)
-		},
+    },
+    isImage(answer) {
+      if (answer === '' || answer === null) {
+        return false
+      } else if (answer.indexOf('.png') !== -1 || answer.indexOf('.jpg') !== -1) {
+        return true
+      } else {
+        return false
+      }
+    },
     combineUrl(url) {
       return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
     },
@@ -470,40 +499,53 @@ export default {
         title: '录音上传中...'
       })
       console.log('录音上传中', this.question, this.subQuesIndex)
+      console.log('上传录音参数', this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath)
       uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
         const data = JSON.parse(res)
-        uni.hideLoading()
-        uni.showLoading({
-          title: '评测中...'
-        })
-        const answerNormalLink = data.data.answerNormalLink
         console.log('uploadMp3ToAliOss', data)
-        const getResult = () => getSpokenAnswerResult(data.data.id).then((resp) => {
-          console.log('getSpokenAnswerResult', resp)
-          const status = resp.data.status
-          if (status === 'Evaluating') {
-            setTimeout(() => {
-              getResult()
-            }, 3000)
-          } else if (status === 'Finished') {
-            this.spokenResult = resp.data.evaluation
-            uni.hideLoading()
-            currentServerTime().then((serverTime) => {
-              examSubmit(this.examId, this.userId, serverTime, [{
-                order: this.question.order,
-                time: this.time,
-                mediaId: data.data.id,
-                audioText: this.question.audioText,
-                studentAnswer: answerNormalLink
-              }]).then((res) => {
-                this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
+        if (data.code !== undefined && data.code === '403') {
+          uni.hideLoading()
+          uni.showModal({
+            title: '提示',
+            content: data.code === '403' ? '登录状态失效，请在其他终端操作' : data.desc,
+            showCancel: false,
+          })
+          getApp().globalData.authStatus = false
+          return false
+        } else {
+          uni.hideLoading()
+          uni.showLoading({
+            title: '评测中...'
+          })
+          const answerNormalLink = data.data.answerNormalLink
+          console.log('uploadMp3ToAliOss', data)
+          const getResult = () => getSpokenAnswerResult(data.data.id).then((resp) => {
+            console.log('getSpokenAnswerResult', resp)
+            const status = resp.data.status
+            if (status === 'Evaluating') {
+              setTimeout(() => {
+                getResult()
+              }, 3000)
+            } else if (status === 'Finished') {
+              this.spokenResult = resp.data.evaluation
+              uni.hideLoading()
+              currentServerTime().then((serverTime) => {
+                examSubmit(this.examId, this.userId, serverTime, [{
+                  order: this.question.order,
+                  time: this.time,
+                  mediaId: data.data.id,
+                  audioText: this.question.audioText,
+                  studentAnswer: answerNormalLink
+                }]).then((res) => {
+                  this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
+                })
               })
-            })
-          }
-        }).catch((err) => {
-          throw new Error(err)
-        })
-        getResult();
+            }
+          }).catch((err) => {
+            throw new Error(err)
+          })
+          getResult();
+        }
       }).catch((err) => {
         throw new Error(err)
       })

@@ -51,6 +51,8 @@
 							v-on:storedTopic='storedTopic'
 							:submitFlag='submitFlag'
 							v-on:updateSubmitFlag='updateSubmitFlag'
+							:showSpokenAnswer='showSpokenAnswer'
+							v-on:showExitBtnAction='showExitBtnAction'
 						/>
 					</view>
 				</view>
@@ -68,6 +70,8 @@
 						v-on:storedTopic='storedTopic'
 						:submitFlag='submitFlag'
 						v-on:updateSubmitFlag='updateSubmitFlag'
+						:showSpokenAnswer='showSpokenAnswer'
+						v-on:showExitBtnAction='showExitBtnAction'
 					/>
 				</view>
 			</view>
@@ -104,7 +108,7 @@ import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/Defaul
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress } from '../../lib/Api'
 export default {
 	components: {
 		ClassTopBaseInfo,
@@ -151,7 +155,9 @@ export default {
 			account: null, // 用户的账户
 			needLogin: false, // 是否需要先进行用户认证
 			showAnswerGuide: false, // 是否显示答题引导,
-			answerGuideIndex: -1 // 当前引导的步骤
+			answerGuideIndex: -1, // 当前引导的步骤
+			showSpokenAnswer: 1, // 1:实时显示口语题答案 0:不实时显示口语题
+      source: '', // OE OA
 		}
 	},
 	computed: {
@@ -179,22 +185,6 @@ export default {
 		currentTopicIndex: {
 			handler(newIndex, oldIndex) {
 				if (this.questionList.length > 0) {
-					// if (this.questionList[newIndex].hasSub) {
-					// 	const subQuestions = this.questionList[newIndex].subQuestions
-					// 	const submitFlag = []
-					// 	subQuestions.forEach((ques, i) => {
-					// 		const type = ques.questionType
-					// 		if (type === QuestionType.SINGLE_ANSWER_QUESTION || type === QuestionType.MULTIPLE_ANSWER_QUESTION || type === QuestionType.BOOL_ANSWER_QUESTION) {
-					// 			submitFlag.push(-1)
-					// 		}
-					// 	})
-					// 	this.submitFlag = submitFlag
-					// 	if (submitFlag.length === 0) {
-					// 		this.submitFlag = true
-					// 	}
-					// 	console.log('submitFlag', this.submitFlag)
-					// } else {
-					// }
 					this.submitFlag = -1
 					console.log('submitFlag', this.submitFlag)
 				}
@@ -212,7 +202,6 @@ export default {
 		// 如果有总限时的话到时自动交卷
 		durationSeconds: {
 			handler(newSec, oldSec) {
-				console.log('durationSeconds', newSec, oldSec)
 				if (newSec <= 0 && this.duration !== null) {
 					uni.showToast({
 						title: '答题时间到！',
@@ -235,7 +224,7 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=db6b31954baa442daac39c51f563489a&key=U_E_17_11923&userId=11923&studentId=11954&examId=2654&mainNum=1&className=0727一班&courseName=0727教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111101&source=OE'
+		// const url = 'https://test.xiaocongkj.com/?token=95e502c21dbb46cca11f3d86ebc6e32c&key=U_E_17_11937&userId=11937&studentId=11968&examId=2654&mainNum=1&className=0727一班&courseName=0727教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111114&source=OE&examType=K12_CLASSROOM_EXERCISES'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -279,10 +268,11 @@ export default {
 			'studentId' in p &&
 			'userId' in p &&
 			'isAnswering' in p &&
-			'source' in p
+			'source' in p &&
+			'examType' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source } = p
+			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source, examType } = p
 			this.currentTopicIndex = Number(mainNum) - 1
 			this.className = className
 			this.courseName = courseName
@@ -292,8 +282,10 @@ export default {
 			this.studentId = Number(studentId)
 			this.userId = Number(userId)
 			this.isAnswering = isAnswering
+			this.examType = examType
 			header.key = key
 			header.token = token
+      this.source = source
 			getApp().globalData.source = source // 全局指定题目来源
 			if ('restart' in p && p.restart === 'true') {
 				this.restart = true
@@ -321,26 +313,82 @@ export default {
   },
 	methods: {
 		initExam(){
-			if (this.restart === true) {
-				restartExam(this.examId, this.userId).then((res) => {
-					this.startOrRestartExamCallback(res)
-				})
-			} else {
-				startExam(this.examId, this.userId).then((res) => {
-					this.startOrRestartExamCallback(res)
-				})
-			}
+      if (this.source === 'OE') {
+				if (this.isAnswering === 'true') {
+					this.startOrRestartAction()
+				} else {
+					this.examInProgressHandler()
+				}
+      } else if (this.source === 'OA') {
+        this.startOrRestartAction()
+      }
 		},
+		examInProgressHandler() {
+			checkExamInProgress().then((res) => {
+				console.log('checkExamInProgress', res)
+				if (this.examType === 'K12_ONLINE_EXAM' && res.showSoe !== undefined) {
+					this.showSpokenAnswer = res.showSoe
+				}
+				if (res.examId === this.examId) {
+					if (res.isExceed) {
+						uni.showToast({
+							title: `超出最大断点续考次数(${res.maxInterruptNum}),正在自动交卷...`,
+							icon: 'none'
+						})
+						setTimeout(() => {
+							this.endExamAction()
+						}, 2000)
+					} else {
+						uni.showToast({
+							title: '正在进入断点续考...',
+							icon: 'none'
+						})
+						findExamQuestionList(this.examId, this.userId).then((res) => {
+							this.examRecordDataId = res[0].examRecordDataId
+						})
+						examHeartbeat(this.examId).then((resp) => {
+							console.log('examHeartbeat', resp)
+							this.durationSeconds = resp / 1000
+							this.duration = Math.floor(this.durationSeconds / 60)
+							this.countdownTimer = setInterval(() => {
+								this.durationSeconds -= 1
+								const remineTime = formatSecondToHHmmss(this.durationSeconds)
+								this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
+							}, 1000)
+						})
+						this.updateQuestionList().then(() => {
+							this.timeLimitList = new Array(this.questionList.length).fill(0)
+							this.timer = setInterval(() => {
+								const newTime = this.timeLimitList[this.currentTopicIndex] + 1
+								this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+							}, 1000)
+						})
+					}
+				} else {
+					this.startOrRestartAction()
+				}
+			})
+		},
+    startOrRestartAction() {
+      if (this.restart === true) {
+      	restartExam(this.examId, this.userId).then((res) => {
+      		this.startOrRestartExamCallback(res)
+      	})
+      } else {
+      	startExam(this.examId, this.userId).then((res) => {
+      		this.startOrRestartExamCallback(res)
+      	})
+      }
+    },
 		startOrRestartExamCallback(res) {
 			console.log('startExam', res)
 			if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
-				// uni.showToast({
-				// 	title: res.desc,
-				// 	icon: 'none'
-				// })
 			} else {
 				this.examRecordDataId = res.examRecordDataId
 				this.duration = res.duration
+				if (this.examType === 'K12_ONLINE_EXAM') {
+					this.showSpokenAnswer = res.showSoe
+				}
 				if (res.duration !== null) {
 					this.durationSeconds = res.duration * 60
 					this.countdownTimer = setInterval(() => {
@@ -516,13 +564,16 @@ export default {
 					})
 					clearInterval(this.countdownTimer)
 					clearInterval(this.timer)
-					this.showExitBtn = true
+					this.showExitBtnAction()
 					if (typeof this.submitFlag === 'number') {
 						this.submitFlag = -1
 					}
 				}
 				console.log('endExam', res)
 			})
+		},
+		showExitBtnAction(){
+			this.showExitBtn = true
 		},
 		submitTopicAction() {
 			const that = this

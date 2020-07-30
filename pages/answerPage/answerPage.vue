@@ -213,6 +213,7 @@ export default {
 		}
 	},
 	onLoad(options) {
+		console.log('invoked onLoad')
 		// 判断是否是第一次使用
 		if (uni.getStorageSync('answerGuide') === '') {
 			this.startAnswerGuide()
@@ -224,8 +225,8 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=95e502c21dbb46cca11f3d86ebc6e32c&key=U_E_17_11937&userId=11937&studentId=11968&examId=2654&mainNum=1&className=0727一班&courseName=0727教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111114&source=OE&examType=K12_CLASSROOM_EXERCISES'
-		const url = decodeURIComponent(options.q)
+		const url = 'https://test.xiaocongkj.com/?token=44840a386a1645dab4e1399ec0cd5a12&key=U_E_17_11937&userId=11937&studentId=11968&examId=2640&mainNum=1&className=0722一班&courseName=0722课堂练习&currentLessonNumber=第3课次&isAnswering=false&account=15911111114&source=OE&examType=K12_CLASSROOM_EXERCISES'
+		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const getParams = (url) => {
@@ -283,18 +284,22 @@ export default {
 			this.userId = Number(userId)
 			this.isAnswering = isAnswering
 			this.examType = examType
-			header.key = key
-			header.token = token
-      this.source = source
 			getApp().globalData.source = source // 全局指定题目来源
+			this.source = source
 			if ('restart' in p && p.restart === 'true') {
 				this.restart = true
 			}
-			if (isAnswering === 'false' && 'account' in p) {
-				this.account = p.account
-				this.needLogin = true
+			header.key = key
+			header.token = token
+			if (this.account !== null) {
+				return
 			} else {
-				this.initExam()
+				if (isAnswering === 'false' && 'account' in p) {
+					this.account = p.account
+					this.needLogin = true
+				} else {
+					this.initExam()
+				}
 			}
 		} else {
 			this.showDefaultView = true

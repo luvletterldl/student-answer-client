@@ -60,6 +60,7 @@ export default {
             // 如果是OE还是用二维码中的token
             header.key = res.user.key
             header.token = res.user.token
+            getApp().globalData.authStatus = true
             this.$emit('authLoginSuccess')
           }
         })

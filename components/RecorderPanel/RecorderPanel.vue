@@ -142,6 +142,14 @@ export default {
           title: '评测中...'
         })
         const answerNormalLink = data.data.answerNormalLink
+        if (data.code !== '0' && data.code !== undefined) {
+          uni.showModal({
+            title: '提示',
+            content: data.desc,
+            showCancel: false
+          })
+          uni.hideLoading()
+        }
         console.log('uploadMp3ToAliOss', data)
         const getResult = () => getSpokenAnswerResult(data.data.id).then((resp) => {
           console.log('getSpokenAnswerResult', resp)

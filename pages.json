@@ -43,6 +43,7 @@
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "",
 		"navigationBarBackgroundColor": "#F3F6FC",
-		"backgroundColor": "#F3F6FC"
+		"backgroundColor": "#F3F6FC",
+    "renderingMode": "seperated"    
 	}
 }

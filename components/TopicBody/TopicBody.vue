@@ -429,6 +429,7 @@ export default {
       }
     },
     uploadTextAnswer(question) {
+      getApp().globalData.legalHideAction = true
       uni.chooseImage({
 			  count: 1,
         sizeType: ['compressed'],
@@ -503,14 +504,16 @@ export default {
       uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
         const data = JSON.parse(res)
         console.log('uploadMp3ToAliOss', data)
-        if (data.code !== undefined && data.code === '403') {
+        if (data.code !== undefined) {
           uni.hideLoading()
           uni.showModal({
             title: '提示',
             content: data.code === '403' ? '登录状态失效，请在其他终端操作' : data.desc,
             showCancel: false,
           })
-          getApp().globalData.authStatus = false
+          if (data.code === '403') {
+            getApp().globalData.authStatus = false
+          }
           return false
         } else {
           uni.hideLoading()

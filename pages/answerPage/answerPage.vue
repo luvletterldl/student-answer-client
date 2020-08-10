@@ -81,8 +81,9 @@
 			</view>
 		</view>
 		<default-answer-page-view v-if="showDefaultView" />
-		<view v-if="showExitBtn" class="exit">
+		<view v-if="showExitBtn" class="exit u-flex u-col-center u-row-around">
 			<navigator class="exitBtn" open-type="exit" target="miniProgram">退出答题</navigator>
+			<text v-if="canRestart" @click="restartAction(true)" class="exitBtn">重做</text>
 		</view>
 		<auth-login
 			:account='account'
@@ -94,6 +95,16 @@
 			v-on:answerGuideChangeStep='answerGuideChangeStep'
 			v-on:hideAnswerGuide='hideAnswerGuide'
 		/>
+		<cover-view @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="camera-container">
+			<camera
+				v-if="cameraCtx !== null"
+				class="capture-face"
+				device-position='front'
+				flash='off'
+				@error='binderror'
+				@initdone='bindinitdone'
+			/>
+		</cover-view>
 	</view>
 </template>
 
@@ -108,7 +119,8 @@ import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/Defaul
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait } from '../../lib/Api'
+const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
 		ClassTopBaseInfo,
@@ -158,6 +170,12 @@ export default {
 			answerGuideIndex: -1, // 当前引导的步骤
 			showSpokenAnswer: 1, // 1:实时显示口语题答案 0:不实时显示口语题
       source: '', // OE OA
+			examType: '', // 考试类型,
+			canRestart: false, // 是否展示可以重做
+			cameraCtx: null, // 获取相机实例
+			cameraTop: '0vh',
+			cameraRight: '0vw',
+			cameraMoveFlag: true,
 		}
 	},
 	computed: {
@@ -181,7 +199,7 @@ export default {
 		}
 	},
 	watch: {
-		// 如果是套题 需要把submitFlag数组元素全部重置为-1
+		// 如果是套题 需要把submitFlag重置为-1
 		currentTopicIndex: {
 			handler(newIndex, oldIndex) {
 				if (this.questionList.length > 0) {
@@ -210,6 +228,14 @@ export default {
 					this.endExamAction()
 				}
 			}
+		},
+		// 当开始或者重开或者断点续考之后获取人脸识别对比数据
+		examRecordDataId: {
+			handler(newId, oldId) {
+				if (newId !== 0) {
+					this.takePhoto()
+				}
+			}
 		}
 	},
 	onLoad(options) {
@@ -225,7 +251,7 @@ export default {
 		this.QuestionType = QuestionType
 		this.ChoiceOption = ChoiceOption
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=44840a386a1645dab4e1399ec0cd5a12&key=U_E_17_11937&userId=11937&studentId=11968&examId=2640&mainNum=1&className=0722一班&courseName=0722课堂练习&currentLessonNumber=第3课次&isAnswering=false&account=15911111114&source=OE&examType=K12_CLASSROOM_EXERCISES'
+		const url = 'https://test.xiaocongkj.com/?token=843d8c136f6a417a9116e9aa6dc88513&key=U_S_17_11925&userId=11925&studentId=11956&examId=2380&mainNum=1&className=0624一班&courseName=0624教研一&currentLessonNumber=1.1.1&isAnswering=false&account=15911111102&source=OA&examType=Assignment'
 		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -269,11 +295,10 @@ export default {
 			'studentId' in p &&
 			'userId' in p &&
 			'isAnswering' in p &&
-			'source' in p &&
-			'examType' in p
+			'source' in p
 		) {
 			this.showDefaultView = false
-			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source, examType } = p
+			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source } = p
 			this.currentTopicIndex = Number(mainNum) - 1
 			this.className = className
 			this.courseName = courseName
@@ -283,7 +308,13 @@ export default {
 			this.studentId = Number(studentId)
 			this.userId = Number(userId)
 			this.isAnswering = isAnswering
-			this.examType = examType
+			if ('examType' in p) {
+				console.log('examType', p.examType)
+				if (['Assignment', 'Preview', 'Enter', 'Exercise'].includes(p.examType)) {
+					this.canRestart = true
+				}
+				this.examType = p.examType
+			}
 			getApp().globalData.source = source // 全局指定题目来源
 			this.source = source
 			if ('restart' in p && p.restart === 'true') {
@@ -301,11 +332,28 @@ export default {
 					this.initExam()
 				}
 			}
+			if (isAnswering === 'true') {
+				getApp().globalData.authStatus = true
+			}
 		} else {
 			this.showDefaultView = true
 		}
 	},
 	onShow() {
+    const that = this
+    uni.authorize({
+      scope: 'scope.camera',
+      success(res) {
+				that.cameraCtx = uni.createCameraContext()
+        // that.takePhoto().then((resp) => {
+        // 	console.log('onShow path', resp)
+        // })
+      },
+      fail(err) {
+				console.log('authorize fail', err)
+				that.authCameraTips()
+      }
+    })
 		const currentFillAnswer = getApp().globalData.currentFillAnswer
 		if (currentFillAnswer.order !== 0) {
 			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
@@ -317,6 +365,7 @@ export default {
 		clearInterval(this.countdownTimer)
   },
 	methods: {
+		// 考试初始化
 		initExam(){
       if (this.source === 'OE') {
 				if (this.isAnswering === 'true') {
@@ -325,9 +374,12 @@ export default {
 					this.examInProgressHandler()
 				}
       } else if (this.source === 'OA') {
-        this.startOrRestartAction()
+				// this.startOrRestartAction()
+				// 从公众号进到小程序
+				this.examInProgressHandler()
       }
 		},
+		// 检测当前考试是否需要断点续考
 		examInProgressHandler() {
 			checkExamInProgress().then((res) => {
 				console.log('checkExamInProgress', res)
@@ -374,6 +426,7 @@ export default {
 				}
 			})
 		},
+		// 开始或者重做
     startOrRestartAction() {
       if (this.restart === true) {
       	restartExam(this.examId, this.userId).then((res) => {
@@ -384,7 +437,47 @@ export default {
       		this.startOrRestartExamCallback(res)
       	})
       }
-    },
+		},
+		// 重做
+		restartAction(isEndExam) {
+			clearInterval(this.countdownTimer)
+			clearInterval(this.timer)
+			if (isEndExam) {
+				restartExam(this.examId, this.userId).then((resp) => {
+					this.questionList = []
+					this.currentTopicIndex = 0
+					this.startOrRestartExamCallback(resp)
+					this.showExitBtn = false
+					getApp().globalData.authStatus = true
+				})
+			} else {
+				uni.showModal({
+					title: '提示',
+					content: '当前答案会被上交，确定要重做吗？',
+					success: (res) => {
+						if (res.confirm) {
+							clearInterval(this.timer)
+							clearInterval(this.countdownTimers)
+							console.log('confirm')
+							this.endExamAction(true).then(() => {
+								restartExam(this.examId, this.userId).then((resp) => {
+									this.questionList = []
+									this.currentTopicIndex = 0
+									this.startOrRestartExamCallback(resp)
+									uni.showToast({
+										title: '开始重做',
+										icon: 'success'
+									})
+									this.showOrHideTopicOverview()
+									getApp().globalData.authStatus = true
+								})
+							})
+						}
+					}
+				})
+			}
+		},
+		// 开始或者重做的回调
 		startOrRestartExamCallback(res) {
 			console.log('startExam', res)
 			if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
@@ -411,6 +504,7 @@ export default {
 				})
 			}
 		},
+		// 更新考试题目列表数据
 		updateQuestionList(params) {
 			console.log('updateQuestionList params', params)
 			if (params) {
@@ -513,17 +607,19 @@ export default {
 				return '0:0'
 			}
 		},
+		// 子组件暂存成功重置状态
 		storedTopic() {
 			this.storeFlag = false
 		},
+		// 触发子组件暂存
     storeTopic() {
-			// this.storeFlag = true
 			this.switchTopic(true)
 			uni.showToast({
 				title: '暂存成功',
 				icon: 'success'
 			})
-    },
+		},
+		// 点击上交
 		submitTopic() {
 			if (this.isAnswering === 'true' || this.isAnswering === true) {
 				uni.showModal({
@@ -536,25 +632,23 @@ export default {
 			console.log('submitTopic', this.submitFlag)
 			if (this.submitFlag === -1) {
 				this.submitFlag = 0
-			// } else if (typeof this.submitFlag === 'object') {
-			// 	this.submitFlag = new Array(this.submitFlag.length).fill(0)
-			// } else if (this.submitFlag === true) {
-			// 	this.submitTopicAction()
 			} else {
 				this.submitTopicAction()
 			}
 		},
+		// 子组件提交题目完成后调用改变submitFlag为1，触发watch中的结束考试操作
 		updateSubmitFlag(data) {
 			console.log('updateSubmitFlag', data, this.submitFlag)
 			if (this.submitFlag === 0) {
 				this.submitFlag = 1
 			}
 		},
-		endExamAction() {
+		// 结束考试
+		endExamAction(unShowExit) {
 			uni.showLoading({
 				title: '上交中...'
 			})
-			endExam(this.examId, this.userId).then((res) => {
+			return endExam(this.examId, this.userId).then((res) => {
 				uni.hideLoading()
 				if (res.code === 'E_K12-OE_M3001') {
 					uni.showToast({
@@ -569,7 +663,10 @@ export default {
 					})
 					clearInterval(this.countdownTimer)
 					clearInterval(this.timer)
-					this.showExitBtnAction()
+					if (!unShowExit) {
+						this.showExitBtnAction()
+						getApp().globalData.authStatus = null
+					}
 					if (typeof this.submitFlag === 'number') {
 						this.submitFlag = -1
 					}
@@ -580,6 +677,7 @@ export default {
 		showExitBtnAction(){
 			this.showExitBtn = true
 		},
+		// 上交前拦截判断
 		submitTopicAction() {
 			const that = this
 			uni.showModal({
@@ -615,18 +713,78 @@ export default {
 			this.needLogin = false
 			this.initExam()
 		},
+		// 考试引导
 		startAnswerGuide() {
 			this.showAnswerGuide = true
 			this.answerGuideChangeStep(0)
 		},
+		// 引导步数
 		answerGuideChangeStep(index) {
 			this.answerGuideIndex = index
 		},
+		// 隐藏引导
 		hideAnswerGuide() {
 			this.answerGuideIndex = -1
 			this.showAnswerGuide = false
 			uni.setStorageSync('answerGuide', '1')
-		}
+		},
+		takePhoto() {
+			const takePhotoAction = () => {
+				return this.cameraCtx.takePhoto().then((res) => {
+					console.log('takePhoto', res.tempImagePath)
+					uploadImageToAliOss(this.examRecordDataId, res.tempImagePath).then((path) => {
+						console.log('uploadImageToAliOss', path)
+						const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
+						comparePortrait(this.account, url).then((resp) => {
+							console.log('comparePortrait', resp)
+						})
+					})
+					return res.tempImagePath
+				}).catch((err) => {
+					console.log('takePhoto Err', err)
+				})
+			}
+			if (this.cameraCtx) {
+				return takePhotoAction()
+			} else {
+				this.cameraCtx = uni.createCameraContext()
+				return takePhotoAction()
+			}
+		},
+		binderror(e) {
+			console.log('binderror', e)
+			this.authCameraTips()
+		},
+    authCameraTips() {
+      uni.showModal({
+      	title: '提示',
+      	content: '为了完成您的答题，请授权您的相机！',
+      	showCancel: false
+      }).then((res) => {
+      	if (res[1].confirm) {
+          uni.openSetting({
+          })
+      	}
+      })
+    },
+		bindinitdone(e) {
+			console.log('bindinitdone', e)
+		},
+		// 相机移动事件处理
+		cameraTouchMove(e) {
+			const { clientX, clientY, pageX, pageY } = e.touches[0]
+			const cameraMoveAction = (x, y) => {
+				this.cameraRight = x >= 0.8 * windowWidth ? '0vw' : x <= 0.2 * windowWidth ? '80vw' : Math.floor(((windowWidth - x) / windowWidth) * 100) + 'vw'
+				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
+			}
+			console.log(clientX, clientY)
+			const x = Math.floor(clientX === 0 ? pageX : clientX)
+			const y = Math.floor(clientY === 0 ? pageY : clientY)
+			if (Math.abs(x) % 2 === 0 || Math.abs(y) % 3 === 0) {
+				console.log('cameraTouchMove', x, y)
+				cameraMoveAction(x, y)
+			}
+		},
 	}
 }
 </script>
@@ -727,6 +885,10 @@ export default {
 				background: rgba(112,166,255,0.2);
 				border: 1px solid #70A6FF;
 			}
+		}
+		.extra-options {
+			color: #666D88;
+			padding: 9px 0;
 		}
 	}
 	.topic-list {
@@ -863,9 +1025,25 @@ export default {
   justify-content: center;
   .exitBtn {
     color: #FFF;
+		margin: 0 3vw;
     padding: 2vw 10vw;
     border-radius: 8vw;
     background: $default-bluelinearbg;
   }
+}
+.camera-container {
+	position: fixed;
+	z-index: 20;
+	width: 20vw;
+	height: 20vh;
+	border-radius: 8px;
+	box-shadow: 0 0 0 2.5vw #FFF;
+	border: solid 1px rgba(0,0,0, .3);
+	.capture-face {
+		z-index: 10;
+		margin: 2.5vw;
+		width: 15vw;
+		height: calc(20vh - 5vw);
+	}
 }
 </style>

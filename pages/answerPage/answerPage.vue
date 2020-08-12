@@ -95,7 +95,7 @@
 			v-on:answerGuideChangeStep='answerGuideChangeStep'
 			v-on:hideAnswerGuide='hideAnswerGuide'
 		/>
-		<cover-view @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="camera-container">
+		<!-- <cover-view @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="camera-container">
 			<camera
 				v-if="cameraCtx !== null"
 				class="capture-face"
@@ -104,7 +104,7 @@
 				@error='binderror'
 				@initdone='bindinitdone'
 			/>
-		</cover-view>
+		</cover-view> -->
 	</view>
 </template>
 
@@ -117,9 +117,9 @@ import AuthLogin from '../../components/AuthLogin/AuthLogin'
 import AnswerGuide from '../../components/CustomGuide/AnswerGuide'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
-import { formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
+import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -150,8 +150,9 @@ export default {
 			assignmentInfo: {}, 
 			questionList: [], // 题目列表
 			currentTopicIndex: 0, // 当前题目索引
-			QuestionType: {}, // 题目类型
-			ChoiceOption: [],
+			QuestionType, // 题目类型
+			questionType: '', // 传进来的题目类型，如果isAnswering是true，过滤掉除此之外的其他类型的题目
+			ChoiceOption,
 			selectedOptions: [], // 选择题选中的索引列表
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
@@ -173,15 +174,14 @@ export default {
 			examType: '', // 考试类型,
 			canRestart: false, // 是否展示可以重做
 			cameraCtx: null, // 获取相机实例
-			cameraTop: '0vh',
-			cameraRight: '0vw',
-			cameraMoveFlag: true,
+			cameraTop: '0vh', // 悬浮相机距离顶部距离
+			cameraRight: '0vw', // 悬浮相机距离右侧距离
 		}
 	},
 	computed: {
 		// 当前题目
 		currentTopic() {
-			if (this.questionList === null || this.questionList === [] || this.questionList === undefined) {
+			if (this.questionList === null || this.questionList.length === 0 || this.questionList === undefined || this.questionList[this.currentTopicIndex] === undefined) {
 				return ''
 			} else {
 				// 改变全局变量中的当前题目类型
@@ -200,96 +200,45 @@ export default {
 	},
 	watch: {
 		// 如果是套题 需要把submitFlag重置为-1
-		currentTopicIndex: {
-			handler(newIndex, oldIndex) {
-				if (this.questionList.length > 0) {
-					this.submitFlag = -1
-					console.log('submitFlag', this.submitFlag)
-				}
-			}
+		currentTopicIndex(newIndex, oldIndex) {
+			this.questionList.length > 0 ? this.submitFlag = -1 : console.log('submitFlag', this.submitFlag)
 		},
 		// 如果全部提交成功就交卷
-		submitFlag: {
-			handler(newFlag, oldFlag) {
-				if (typeof newFlag === 'number' && newFlag === 1) {
-					console.log('watch submitFlag number', newFlag)
-					this.submitTopicAction()
-				}
-			}
+		submitFlag(newFlag, oldFlag) {
+			typeof newFlag === 'number' && newFlag === 1 ? this.submitTopicAction() : console.log('watch submitFlag number', newFlag)
 		},
 		// 如果有总限时的话到时自动交卷
-		durationSeconds: {
-			handler(newSec, oldSec) {
-				if (newSec <= 0 && this.duration !== null) {
-					uni.showToast({
-						title: '答题时间到！',
-						icon: 'none'
-					})
-					this.endExamAction()
-				}
-			}
+		durationSeconds(newSec, oldSec) {
+			newSec <= 0 && this.duration !== null ? () => {
+				uni.showToast({
+					title: '答题时间到！',
+					icon: 'none'
+				})
+				this.endExamAction()
+			} : () => {}
 		},
 		// 当开始或者重开或者断点续考之后获取人脸识别对比数据
-		examRecordDataId: {
-			handler(newId, oldId) {
-				if (newId !== 0) {
-					this.takePhoto()
-				}
-			}
+		examRecordDataId(newId, oldId) {
+			getApp().globalData.examRecordDataId = newId !== 0 ? newId : 0 // 更新全局数据
+			newId !== 0 ? this.takePhoto() : () => {}
 		}
 	},
 	onLoad(options) {
-		console.log('invoked onLoad')
-		// 判断是否是第一次使用
-		if (uni.getStorageSync('answerGuide') === '') {
-			this.startAnswerGuide()
-		}
-		// 保持屏幕常亮
-		uni.setKeepScreenOn({
-			keepScreenOn: true
-		})
-		this.QuestionType = QuestionType
-		this.ChoiceOption = ChoiceOption
+		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
+		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=843d8c136f6a417a9116e9aa6dc88513&key=U_S_17_11925&userId=11925&studentId=11956&examId=2380&mainNum=1&className=0624一班&courseName=0624教研一&currentLessonNumber=1.1.1&isAnswering=false&account=15911111102&source=OA&examType=Assignment'
-		// const url = decodeURIComponent(options.q)
+		// const url = 'https://test.xiaocongkj.com/?token=77a033b628034d3287e05ec87d241ae3&key=U_E_17_11930&userId=11930&studentId=11961&examId=2708&examRecordDataId=3233&mainNum=26&className=0811线上测评1&courseName=undefined&currentLessonNumber=undefined&isAnswering=true&source=OE&examType=K12_ONLINE_EXAM&questionType=SPOKEN_ANSWER_QUESTION'
+		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
-		const getParams = (url) => {
-			if (url === undefined) {
-				return ''
-			} else if (url !== '') {
-				console.log('url', url)
-				let paramsList = url.split('?')[1]
-				Main.host = url.split('?')[0]
-				if (paramsList) {
-					paramsList = paramsList.split('&')
-				} else {
-					throw new Error(`没有合适的传参: url: ${url}, options.q: ${options.q}`)
-					return
-				}
-				let params = {}
-				paramsList.forEach((v, i) => {
-					params[v.split('=')[0]] = v.split('=')[1]
-				})
-				return params
-			} else {
-				return ''
-			}
-		}
-		let p = undefined
-		if (q !== undefined && q !== '' && q !== null) {
-		 	p = getParams(q)
-		} else {
-			return false
-		}
+		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
 		if (
 			'token' in p &&
 			'key' in p &&
 			'mainNum' in p &&
 			'className' in p &&
 			'courseName' in p &&
-			'currentLessonNumber' in p &&
+			// 'currentLessonNumber' in p &&
 			'examId' in p &&
 			// 'examRecordDataId' in p &&
 			'studentId' in p &&
@@ -297,43 +246,35 @@ export default {
 			'isAnswering' in p &&
 			'source' in p
 		) {
+			const { token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source } = p
+			header.key = key
+			header.token = token
 			this.showDefaultView = false
-			const {token, key, mainNum, className, currentLessonNumber, courseName, examId, studentId, userId, isAnswering, source } = p
 			this.currentTopicIndex = Number(mainNum) - 1
 			this.className = className
 			this.courseName = courseName
 			this.currentLessonNumber = currentLessonNumber
 			this.examId = Number(examId)
-			// this.examRecordDataId = Number(examRecordDataId)
+			this.examRecordDataId = 'examRecordDataId' in p ? Number(p.examRecordDataId) : 0
 			this.studentId = Number(studentId)
 			this.userId = Number(userId)
-			this.isAnswering = isAnswering
-			if ('examType' in p) {
-				console.log('examType', p.examType)
-				if (['Assignment', 'Preview', 'Enter', 'Exercise'].includes(p.examType)) {
-					this.canRestart = true
-				}
-				this.examType = p.examType
-			}
-			getApp().globalData.source = source // 全局指定题目来源
+			this.isAnswering = isAnswering === 'true' ? true : isAnswering === 'false' ? false : null
 			this.source = source
-			if ('restart' in p && p.restart === 'true') {
-				this.restart = true
-			}
-			header.key = key
-			header.token = token
-			if (this.account !== null) {
-				return
-			} else {
-				if (isAnswering === 'false' && 'account' in p) {
+			// 如果属于预习，作业，进门测，课堂练习中的一种则当前考试可以重做
+			this.examType = 'examType' in p ? p.examType : ''
+			this.canRestart = ['Assignment', 'Preview', 'Enter', 'Exercise'].includes(this.examType) ? true : false
+			this.restart = 'restart' in p && p.restart === 'true' ? true : null // 如果restart是true，则赋值
+			this.questionType = 'questionType' in p && this.isAnswering ? p.questionType : ''
+			getApp().globalData.isAnswering = this.isAnswering
+			getApp().globalData.source = source // 全局指定题目来源
+			getApp().globalData.authStatus = this.isAnswering ? true : null // 如果isAnswing是true，则全局验证字段为true
+			if (this.account === null) {
+				if (!this.isAnswering && 'account' in p) {
 					this.account = p.account
 					this.needLogin = true
 				} else {
 					this.initExam()
 				}
-			}
-			if (isAnswering === 'true') {
-				getApp().globalData.authStatus = true
 			}
 		} else {
 			this.showDefaultView = true
@@ -341,19 +282,19 @@ export default {
 	},
 	onShow() {
     const that = this
-    uni.authorize({
-      scope: 'scope.camera',
-      success(res) {
-				that.cameraCtx = uni.createCameraContext()
-        // that.takePhoto().then((resp) => {
-        // 	console.log('onShow path', resp)
-        // })
-      },
-      fail(err) {
-				console.log('authorize fail', err)
-				that.authCameraTips()
-      }
-    })
+    // uni.authorize({
+    //   scope: 'scope.camera',
+    //   success(res) {
+		// 		that.cameraCtx = uni.createCameraContext()
+    //     // that.takePhoto().then((resp) => {
+    //     // 	console.log('onShow path', resp)
+    //     // })
+    //   },
+    //   fail(err) {
+		// 		console.log('authorize fail', err)
+		// 		that.authCameraTips()
+    //   }
+    // })
 		const currentFillAnswer = getApp().globalData.currentFillAnswer
 		if (currentFillAnswer.order !== 0) {
 			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
@@ -367,17 +308,39 @@ export default {
 	methods: {
 		// 考试初始化
 		initExam(){
-      if (this.source === 'OE') {
-				if (this.isAnswering === 'true') {
-					this.startOrRestartAction()
+      // if (this.source === 'OE') {
+			// 	if (this.isAnswering) {
+			// 		this.startOrRestartAction()
+			// 	} else {
+			// 		this.examInProgressHandler()
+			// 	}
+      // } else if (this.source === 'OA') {
+			// 	// this.startOrRestartAction()
+			// 	// 从公众号进到小程序
+			// 	this.examInProgressHandler()
+			// }
+			if (this.source === 'OE' && this.isAnswering) {
+				if (this.examRecordDataId === 0) {
+					findExamQuestionList(this.examId, this.userId).then((res) => {
+						this.examRecordDataId = res[0].examRecordDataId
+						if (this.isAnswering) {
+							this.lockTerminalAction()
+						}
+					})
 				} else {
-					this.examInProgressHandler()
+					this.lockTerminalAction()
 				}
-      } else if (this.source === 'OA') {
-				// this.startOrRestartAction()
-				// 从公众号进到小程序
+			} else {
 				this.examInProgressHandler()
-      }
+			}
+		},
+		// 锁终端操作，成功后继续考试
+		lockTerminalAction() {
+			lockTerminalLock(this.userId, this.studentId, this.examId, this.examRecordDataId, this.examType, this.questionType).then((resp) => {
+				console.log('lockTerminalLock', resp)
+				// 加锁成功后加载考试的数据，开始作答
+				this.continueExam()
+			})
 		},
 		// 检测当前考试是否需要断点续考
 		examInProgressHandler() {
@@ -400,30 +363,31 @@ export default {
 							title: '正在进入断点续考...',
 							icon: 'none'
 						})
-						findExamQuestionList(this.examId, this.userId).then((res) => {
-							this.examRecordDataId = res[0].examRecordDataId
-						})
-						examHeartbeat(this.examId).then((resp) => {
-							console.log('examHeartbeat', resp)
-							this.durationSeconds = resp / 1000
-							this.duration = Math.floor(this.durationSeconds / 60)
-							this.countdownTimer = setInterval(() => {
-								this.durationSeconds -= 1
-								const remineTime = formatSecondToHHmmss(this.durationSeconds)
-								this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
-							}, 1000)
-						})
-						this.updateQuestionList().then(() => {
-							this.timeLimitList = new Array(this.questionList.length).fill(0)
-							this.timer = setInterval(() => {
-								const newTime = this.timeLimitList[this.currentTopicIndex] + 1
-								this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
-							}, 1000)
-						})
+						this.continueExam()
 					}
 				} else {
 					this.startOrRestartAction()
 				}
+			})
+		},
+		// 继续考试
+		continueExam() {
+			examHeartbeat(this.examId).then((resp) => {
+				console.log('examHeartbeat', resp)
+				this.durationSeconds = resp / 1000
+				this.duration = Math.floor(this.durationSeconds / 60)
+				this.countdownTimer = setInterval(() => {
+					this.durationSeconds -= 1
+					const remineTime = formatSecondToHHmmss(this.durationSeconds)
+					this.remineTime = `${remineTime.hour}:${remineTime.min}:${remineTime.second}`
+				}, 1000)
+			})
+			this.updateQuestionList().then(() => {
+				this.timeLimitList = new Array(this.questionList.length).fill(0)
+				this.timer = setInterval(() => {
+					const newTime = this.timeLimitList[this.currentTopicIndex] + 1
+					this.timeLimitList.splice(this.currentTopicIndex, 1, newTime)
+				}, 1000)
 			})
 		},
 		// 开始或者重做
@@ -540,49 +504,47 @@ export default {
 			} else {
 				return getQuestions(this.examId, this.userId).then((res) => {
 					console.log('getQuestions', res)
-					if (res.code === "E_K12-OE_S2001") {
-						uni.showToast({
-							title: res.desc,
-							icon: 'none'
-						})
+					const { code, data } = res
+					if (code === "E_K12-OE_S2001") {
+						uni.showToast({ title: desc, icon: 'none' })
 						return
 					} else {
-						this.questionList = res.data
+						const type = this.questionType
+						if (this.isAnswering && type !== '') {
+							this.questionList = data.filter((question) => {
+								if (question.hasSub) {
+									const subQuesList = question.subQuestions
+									const filteredSubQuesList = subQuesList.filter((subQues) => {
+										if (subQues.questionType === type) return subQues
+									})
+									if (filteredSubQuesList.length > 0) return filteredSubQuesList
+								} else if (question.questionType === type) {
+									return question
+								}
+							})
+							this.currentTopicIndex = this.questionList.findIndex((question) => {
+								return this.currentTopicIndex === question.mainNum
+							})
+							if (this.currentTopicIndex === -1) {
+								this.currentTopicIndex = 0
+							}
+						} else {
+							this.questionList = data
+						}
 					}
 				})
 			}
 		},
 		// 左右切换题目
 		switchTopic(dir) {
-			const audioPlaying = getApp().globalData.audioPlaying
-			const audioRecording = getApp().globalData.audioRecording
+			const { audioPlaying, audioRecording } = getApp().globalData
 			if (audioPlaying || audioRecording) {
-				let title = ''
-				if (audioPlaying) {
-					title = '请先暂停音频播放'
-				} else if (audioRecording) {
-					title = '请先结束录音'
-				}
-				uni.showToast({
-					title: title,
-					icon: 'none'
-				})
+				const title = audioRecording ? '请先结束录音' : '请先暂停音频播放'
+				uni.showToast({ title, icon: 'none' })
 				return false
 			} else {
-				let newIndex = this.currentTopicIndex
-				const questionList = this.questionList
-				const questionLength = this.questionList.length
-				dir ? newIndex += 1 : newIndex -= 1
-				if (newIndex > questionLength - 1) {
-					this.currentTopicIndex = 0
-					// this.order = questionList[0].order
-				} else if (newIndex < 0) {
-					this.currentTopicIndex = questionLength - 1
-					// this.order = questionList[this.currentTopicIndex].order
-				} else {
-					this.currentTopicIndex = newIndex
-					// this.order = questionList[newIndex].order
-				}
+				const newIndex = dir ? this.currentTopicIndex + 1 : this.currentTopicIndex - 1
+				this.currentTopicIndex = newIndex > this.questionList.length - 1 ? 0 : newIndex < 0 ? this.questionList.length - 1 : newIndex
 			}
 		},
 		// 展示或隐藏总览
@@ -600,7 +562,7 @@ export default {
 		},
 		// 倒计时
 		fmtSecToMin(time) {
-			if (this.timeLimitList.length > 0) {
+			if (this.timeLimitList.length > 0 && time !== undefined) {
 				const fmtTime = formatSecondToHHmmss(time)
 				return `${fmtTime.min}:${fmtTime.second}`
 			} else {
@@ -621,55 +583,35 @@ export default {
 		},
 		// 点击上交
 		submitTopic() {
-			if (this.isAnswering === 'true' || this.isAnswering === true) {
-				uni.showModal({
-					title: '提示',
-					content: '请在原终端进行提交!',
-          showCancel: false,
-				})
+			if (this.isAnswering) {
+				uni.showModal({ title: '提示', content: '请在原终端进行提交!', showCancel: false })
         return false
 			}
 			console.log('submitTopic', this.submitFlag)
-			if (this.submitFlag === -1) {
-				this.submitFlag = 0
-			} else {
-				this.submitTopicAction()
-			}
+			this.submitFlag === -1 ? this.submitFlag = 0 : this.submitTopicAction()
 		},
 		// 子组件提交题目完成后调用改变submitFlag为1，触发watch中的结束考试操作
 		updateSubmitFlag(data) {
 			console.log('updateSubmitFlag', data, this.submitFlag)
-			if (this.submitFlag === 0) {
-				this.submitFlag = 1
-			}
+			this.submitFlag === 0 ? this.submitFlag = 1 : () => {}
 		},
 		// 结束考试
 		endExamAction(unShowExit) {
-			uni.showLoading({
-				title: '上交中...'
-			})
+			uni.showLoading({ title: '上交中...' })
 			return endExam(this.examId, this.userId).then((res) => {
 				uni.hideLoading()
 				if (res.code === 'E_K12-OE_M3001') {
-					uni.showToast({
-						title: res.desc,
-						icon: 'none'
-					})
+					uni.showToast({ title: res.desc, icon: 'none' })
 					return
 				} else {
-					uni.showToast({
-						title: '提交成功',
-						icon: 'success',
-					})
+					uni.showToast({ title: '提交成功', icon: 'success' })
 					clearInterval(this.countdownTimer)
 					clearInterval(this.timer)
 					if (!unShowExit) {
 						this.showExitBtnAction()
 						getApp().globalData.authStatus = null
 					}
-					if (typeof this.submitFlag === 'number') {
-						this.submitFlag = -1
-					}
+					typeof this.submitFlag === 'number' ? this.submitFlag = -1 : () => {}
 				}
 				console.log('endExam', res)
 			})
@@ -695,15 +637,10 @@ export default {
 							confirmText: '需要',
 							cancelText: '不需要',
               success(resp) {
-                if (resp.confirm) {
-                  that.startAnswerGuide()
-                }
+								resp.confirm ? that.startAnswerGuide() : () => {}
               }
 						})
-						console.log(that.submitFlag)
-            if (that.submitFlag === 1) {
-            	that.submitFlag = -1
-            }
+						that.submitFlag === 1 ? that.submitFlag = -1 : () => {}
           }
         }
 			})
@@ -732,13 +669,13 @@ export default {
 			const takePhotoAction = () => {
 				return this.cameraCtx.takePhoto().then((res) => {
 					console.log('takePhoto', res.tempImagePath)
-					uploadImageToAliOss(this.examRecordDataId, res.tempImagePath).then((path) => {
-						console.log('uploadImageToAliOss', path)
-						const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
-						comparePortrait(this.account, url).then((resp) => {
-							console.log('comparePortrait', resp)
-						})
-					})
+					// uploadImageToAliOss(this.examRecordDataId, res.tempImagePath).then((path) => {
+					// 	console.log('uploadImageToAliOss', path)
+					// 	const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
+					// 	comparePortrait(this.account, url).then((resp) => {
+					// 		console.log('comparePortrait', resp)
+					// 	})
+					// })
 					return res.tempImagePath
 				}).catch((err) => {
 					console.log('takePhoto Err', err)
@@ -751,38 +688,31 @@ export default {
 				return takePhotoAction()
 			}
 		},
+		// 授权相机提示
+    authCameraTips() {
+			uni.showModal({
+				title: '提示',
+      	content: '为了完成您的答题，请授权您的相机！',
+      	showCancel: false
+      }).then((res) => {
+				res[1].confirm ? uni.openSetting() : () => {}
+      })
+    },
 		binderror(e) {
 			console.log('binderror', e)
 			this.authCameraTips()
 		},
-    authCameraTips() {
-      uni.showModal({
-      	title: '提示',
-      	content: '为了完成您的答题，请授权您的相机！',
-      	showCancel: false
-      }).then((res) => {
-      	if (res[1].confirm) {
-          uni.openSetting({
-          })
-      	}
-      })
-    },
 		bindinitdone(e) {
 			console.log('bindinitdone', e)
 		},
 		// 相机移动事件处理
 		cameraTouchMove(e) {
 			const { clientX, clientY, pageX, pageY } = e.touches[0]
-			const cameraMoveAction = (x, y) => {
-				this.cameraRight = x >= 0.8 * windowWidth ? '0vw' : x <= 0.2 * windowWidth ? '80vw' : Math.floor(((windowWidth - x) / windowWidth) * 100) + 'vw'
-				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
-			}
-			console.log(clientX, clientY)
 			const x = Math.floor(clientX === 0 ? pageX : clientX)
 			const y = Math.floor(clientY === 0 ? pageY : clientY)
 			if (Math.abs(x) % 2 === 0 || Math.abs(y) % 3 === 0) {
-				console.log('cameraTouchMove', x, y)
-				cameraMoveAction(x, y)
+				this.cameraRight = x >= 0.8 * windowWidth ? '0vw' : x <= 0.2 * windowWidth ? '80vw' : Math.floor(((windowWidth - x) / windowWidth) * 100) + 'vw'
+				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
 			}
 		},
 	}
@@ -902,15 +832,12 @@ export default {
 		color: $blackcolor;
 		.ques-top-body {
 			padding: 3vw;
-			// background: linear-gradient(135deg, #4edbab 0%, #90e2a9 100%);
 			background: #FFF;
 			border-radius: 8px 8px 0 0;
 			border-bottom: $default-bgcolor 1px solid;
 			.ques-type {
 				padding: 1vw 1.5vw;
 				border-radius: 20px;
-				// border: solid 1px #f7ff00;
-				// color: #f7ff00;
 			}
 			.questBody {
 				margin: 10px;
@@ -1037,7 +964,7 @@ export default {
 	width: 20vw;
 	height: 20vh;
 	border-radius: 8px;
-	box-shadow: 0 0 0 2.5vw #FFF;
+	box-shadow: 0 0 0 2.5vw #FFF inset;
 	border: solid 1px rgba(0,0,0, .3);
 	.capture-face {
 		z-index: 10;

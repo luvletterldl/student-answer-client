@@ -95,7 +95,7 @@
 			v-on:answerGuideChangeStep='answerGuideChangeStep'
 			v-on:hideAnswerGuide='hideAnswerGuide'
 		/>
-		<!-- <cover-view @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="camera-container">
+		<cover-view v-if="cameraCtx !== null" @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="snap-camera">
 			<camera
 				v-if="cameraCtx !== null"
 				class="capture-face"
@@ -104,7 +104,14 @@
 				@error='binderror'
 				@initdone='bindinitdone'
 			/>
-		</cover-view> -->
+		</cover-view>
+		<before-exam-camera
+			v-if="faceCheckStatus"
+			:examRecordDataId='examRecordDataId'
+			:account='account'
+			:cameraCtx='cameraCtx'
+			v-on:initExam='initExam'
+		/>
 	</view>
 </template>
 
@@ -116,10 +123,11 @@ import TopicBody from '../../components/TopicBody/TopicBody'
 import AuthLogin from '../../components/AuthLogin/AuthLogin'
 import AnswerGuide from '../../components/CustomGuide/AnswerGuide'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
+import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
-import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg } from '../../lib/Utils';
+import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -128,6 +136,7 @@ export default {
 		RecorderPanel,
 		TopicBody,
 		DefaultAnswerPageView,
+		BeforeExamCamera,
 		AuthLogin,
 		AnswerGuide,
 	},
@@ -161,6 +170,7 @@ export default {
 			remineTime: '', // 剩余考试时间
 			timer: 0, // 计时器,
 			countdownTimer: 0, // 考试剩余时间计时器
+			snapshotTimer: 0, // 抓拍计时器
 			storeFlag: false, // 暂存标识
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
 			isAnswering: null, // true: 表明已经在其他终端开始作答，本终端不能上交； false: 在本终端开启作答，可以在本终端上交
@@ -176,6 +186,9 @@ export default {
 			cameraCtx: null, // 获取相机实例
 			cameraTop: '0vh', // 悬浮相机距离顶部距离
 			cameraRight: '0vw', // 悬浮相机距离右侧距离
+			beforeExamFaceEnable: false, // 是否开启监考
+			beforeExamFaceCheck: false, // 是否要在登录后考试前进行人脸检查
+			faceCheckStatus: false, // 人脸检测是否展示
 		}
 	},
 	computed: {
@@ -220,15 +233,15 @@ export default {
 		// 当开始或者重开或者断点续考之后获取人脸识别对比数据
 		examRecordDataId(newId, oldId) {
 			getApp().globalData.examRecordDataId = newId !== 0 ? newId : 0 // 更新全局数据
-			newId !== 0 ? this.takePhoto() : () => {}
 		}
 	},
 	onLoad(options) {
+		// this.beforeExamFaceCheck = true
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=77a033b628034d3287e05ec87d241ae3&key=U_E_17_11930&userId=11930&studentId=11961&examId=2708&examRecordDataId=3233&mainNum=26&className=0811线上测评1&courseName=undefined&currentLessonNumber=undefined&isAnswering=true&source=OE&examType=K12_ONLINE_EXAM&questionType=SPOKEN_ANSWER_QUESTION'
-		const url = decodeURIComponent(options.q)
+		const url = 'https://test.xiaocongkj.com/?token=29cc010c6cd44d43885f83fbdc0eef71&key=U_E_17_11933&userId=11933&studentId=11964&examId=2686&mainNum=1&className=0731一班&courseName=0731教研一（考试）&currentLessonNumber=第3课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false'
+		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
@@ -281,20 +294,6 @@ export default {
 		}
 	},
 	onShow() {
-    const that = this
-    // uni.authorize({
-    //   scope: 'scope.camera',
-    //   success(res) {
-		// 		that.cameraCtx = uni.createCameraContext()
-    //     // that.takePhoto().then((resp) => {
-    //     // 	console.log('onShow path', resp)
-    //     // })
-    //   },
-    //   fail(err) {
-		// 		console.log('authorize fail', err)
-		// 		that.authCameraTips()
-    //   }
-    // })
 		const currentFillAnswer = getApp().globalData.currentFillAnswer
 		if (currentFillAnswer.order !== 0) {
 			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
@@ -304,21 +303,12 @@ export default {
   beforeDestroy() {
 		clearInterval(this.timer)
 		clearInterval(this.countdownTimer)
+		clearInterval(this.snapshotTimer)
   },
 	methods: {
 		// 考试初始化
-		initExam(){
-      // if (this.source === 'OE') {
-			// 	if (this.isAnswering) {
-			// 		this.startOrRestartAction()
-			// 	} else {
-			// 		this.examInProgressHandler()
-			// 	}
-      // } else if (this.source === 'OA') {
-			// 	// this.startOrRestartAction()
-			// 	// 从公众号进到小程序
-			// 	this.examInProgressHandler()
-			// }
+		initExam() {
+			this.faceCheckStatus = false
 			if (this.source === 'OE' && this.isAnswering) {
 				if (this.examRecordDataId === 0) {
 					findExamQuestionList(this.examId, this.userId).then((res) => {
@@ -363,6 +353,7 @@ export default {
 							title: '正在进入断点续考...',
 							icon: 'none'
 						})
+						this.snapshotHandler(res.snapshotInterval)
 						this.continueExam()
 					}
 				} else {
@@ -446,13 +437,15 @@ export default {
 			console.log('startExam', res)
 			if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
 			} else {
-				this.examRecordDataId = res.examRecordDataId
-				this.duration = res.duration
+				const { examRecordDataId, duration, showSoe, snapshotInterval } = res
+				this.examRecordDataId = examRecordDataId
+				this.duration = duration
+				this.snapshotHandler(snapshotInterval)
 				if (this.examType === 'K12_ONLINE_EXAM') {
-					this.showSpokenAnswer = res.showSoe
+					this.showSpokenAnswer = showSoe
 				}
-				if (res.duration !== null) {
-					this.durationSeconds = res.duration * 60
+				if (duration > 0) {
+					this.durationSeconds = duration * 60
 					this.countdownTimer = setInterval(() => {
 						this.durationSeconds -= 1
 						const remineTime = formatSecondToHHmmss(this.durationSeconds)
@@ -499,7 +492,6 @@ export default {
 					}
 				})
 				getApp().globalData.currentFillAnswer.order = 0 // 刷新questionList后重置currentFillAnswer
-				// this.questionList = questionList
 				console.log('questionList', questionList)
 			} else {
 				return getQuestions(this.examId, this.userId).then((res) => {
@@ -509,6 +501,7 @@ export default {
 						uni.showToast({ title: desc, icon: 'none' })
 						return
 					} else {
+						// 如果是从网考答题中扫码进来过滤出扫码题目类型的题
 						const type = this.questionType
 						if (this.isAnswering && type !== '') {
 							this.questionList = data.filter((question) => {
@@ -549,7 +542,7 @@ export default {
 		},
 		// 展示或隐藏总览
 		showOrHideTopicOverview() {
-			this.showTopicTab = this.showTopicTab ? false : true
+			this.showTopicTab = !this.showTopicTab
 		},
 		// 选择某一题
 		chooseQuestion(index) {
@@ -647,8 +640,35 @@ export default {
 		},
 		// 用户认证成功回调
 		authLoginSuccess() {
+			// 如果需要考试前认证先不初始化
 			this.needLogin = false
-			this.initExam()
+			uni.showLoading()
+			// 检查考试是否需要开启监考，是否需要开启人脸检查
+			examFaceEnable(2709).then((res) => {
+				console.log('examFaceEnable', res)
+				if (res === 1) {
+					const that = this
+					uni.authorize({
+						scope: 'scope.camera',
+						success(res) {
+							that.cameraCtx = uni.createCameraContext()
+						},
+						fail(err) {
+							console.log('authorize fail', err)
+							authCameraTips()
+						}
+					})
+					examFaceCheck(2709).then((res) => {
+						console.log('examFaceCheck', res)
+						if (res === 1) {
+							this.faceCheckStatus = true
+						}
+					})
+				} else {
+					this.initExam()
+				}
+				uni.hideLoading()
+			})
 		},
 		// 考试引导
 		startAnswerGuide() {
@@ -668,39 +688,25 @@ export default {
 		takePhoto() {
 			const takePhotoAction = () => {
 				return this.cameraCtx.takePhoto().then((res) => {
-					console.log('takePhoto', res.tempImagePath)
-					// uploadImageToAliOss(this.examRecordDataId, res.tempImagePath).then((path) => {
-					// 	console.log('uploadImageToAliOss', path)
-					// 	const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
-					// 	comparePortrait(this.account, url).then((resp) => {
-					// 		console.log('comparePortrait', resp)
-					// 	})
-					// })
+					const tempPath = res.tempImagePath
+					console.log('takePhoto', tempPath)
+					uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
+						console.log('uploadFaceToAliOss', path)
+					})
 					return res.tempImagePath
 				}).catch((err) => {
 					console.log('takePhoto Err', err)
 				})
 			}
-			if (this.cameraCtx) {
-				return takePhotoAction()
-			} else {
+			if (this.cameraCtx === null) {
 				this.cameraCtx = uni.createCameraContext()
-				return takePhotoAction()
 			}
+			return takePhotoAction()
 		},
-		// 授权相机提示
-    authCameraTips() {
-			uni.showModal({
-				title: '提示',
-      	content: '为了完成您的答题，请授权您的相机！',
-      	showCancel: false
-      }).then((res) => {
-				res[1].confirm ? uni.openSetting() : () => {}
-      })
-    },
+
 		binderror(e) {
 			console.log('binderror', e)
-			this.authCameraTips()
+			authCameraTips()
 		},
 		bindinitdone(e) {
 			console.log('bindinitdone', e)
@@ -715,6 +721,17 @@ export default {
 				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
 			}
 		},
+		snapshotHandler(snapshotInterval) {
+			// if (snapshotInterval && snapshotInterval > 0) {
+			console.log('snapshotHandler', snapshotInterval)
+			if (true) {
+				this.snapshotTimer = setInterval(() => {
+					// TODO 每隔minutes分钟抓拍一次
+					this.takePhoto()
+				}, Math.floor(100 * 60))
+				// }, Math.floor(1 * 60) * 1000)
+			}
+		}
 	}
 }
 </script>
@@ -958,7 +975,7 @@ export default {
     background: $default-bluelinearbg;
   }
 }
-.camera-container {
+.snap-camera {
 	position: fixed;
 	z-index: 20;
 	width: 20vw;
@@ -973,4 +990,5 @@ export default {
 		height: calc(20vh - 5vw);
 	}
 }
+
 </style>

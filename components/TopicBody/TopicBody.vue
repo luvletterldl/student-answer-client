@@ -429,6 +429,7 @@ export default {
       }
     },
     uploadTextAnswer(question) {
+      // 标识此操作导致的onHide为合法
       getApp().globalData.legalHideAction = true
       uni.chooseImage({
 			  count: 1,
@@ -439,7 +440,9 @@ export default {
             title: '上传中...',
           })
 					const filePath = res[1].tempFilePaths[0]
-					console.log(res, this.examId, filePath)
+          console.log(res, this.examId, filePath)
+          // 此操作完成后重置为false
+          getApp().globalData.legalHideAction = false
           uploadImageToAliOss(this.examId, filePath).then((resp) => {
             uni.hideLoading()
             uni.showLoading({ title: '提交中...' })

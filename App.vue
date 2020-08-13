@@ -41,8 +41,9 @@ export default {
 	onHide: function() {
 		console.log('App Hide');
 		this.$scope.globalData.hasHideAction = true
-		const { isAnswering, examRecordDataId } = this.$scope.globalData
-		if (isAnswering && examRecordDataId !== 0) {
+		const { isAnswering, examRecordDataId, legalHideAction } = this.$scope.globalData
+		// 如果合法操作就不触发unLock
+		if (isAnswering && examRecordDataId !== 0 && legalHideAction === false) {
 			unLockTerminal(examRecordDataId).then((res) => {
 				if (res.code === '0') {
 					this.$scope.globalData.authStatus = false // 触发showExitBtn

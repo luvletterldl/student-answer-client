@@ -95,9 +95,9 @@
 			v-on:answerGuideChangeStep='answerGuideChangeStep'
 			v-on:hideAnswerGuide='hideAnswerGuide'
 		/>
-		<cover-view v-if="cameraCtx !== null" @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="snap-camera">
+		<cover-view v-if="cameraCtx !== null && !faceCheckStatus" @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="snap-camera">
 			<camera
-				v-if="cameraCtx !== null"
+				v-if="cameraCtx !== null && !faceCheckStatus"
 				class="capture-face"
 				device-position='front'
 				flash='off'

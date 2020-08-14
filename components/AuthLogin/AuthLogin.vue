@@ -75,17 +75,6 @@ export default {
               console.log('examFaceEnable', res)
               if (res === 1) {
                 faceEnable = true
-                const that = this
-                // uni.authorize({
-                //   scope: 'scope.camera',
-                //   success(resp) {
-                //     getApp().globalData.legalHideAction = false
-                //   },
-                //   fail(err) {
-                //     console.log('authorize fail', err)
-                //     getApp().globalData.legalHideAction = true
-                //   }
-                // })
               }
               this.$emit('authLoginSuccess', faceEnable) 
             })

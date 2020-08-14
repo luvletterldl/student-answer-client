@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import Main from '../../lib/Main.js'
+import Main from '../../lib/Main'
 import { uploadImageToAliOss, currentServerTime, examSubmit, findExamQuestionList } from '../../lib/Api.js'
 const windowWidth = uni.getSystemInfoSync().windowWidth
 const imgPreUrl = `${Main.host}api/k12/wx/getImage?filePath=`
@@ -91,6 +91,7 @@ export default {
       this.ctx.draw(true)
 		},
 		save() {
+			getApp().globalData.legalHideAction = false
       uni.canvasToTempFilePath({
         x: 0,
         y: 0,
@@ -128,6 +129,7 @@ export default {
       })
 		},
 		back() {
+			getApp().globalData.legalHideAction = false
 			uni.navigateBack()
 		}
 	}

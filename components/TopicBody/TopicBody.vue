@@ -20,13 +20,13 @@
       <view @click="toFillAnswer(fmtFillAnswer(question), index)" v-for="(item, index) in fmtFillAnswer(question)" :key="index" class="option">
         <view class="option-index">{{ index + 1 }}</view>
         <text v-if='item === ""'>点击输入</text>
-        <image v-else-if="isImage(item)" :src='combineUrl(item)' class="fill-topic-img" />
+        <image v-else-if="isImage(item)" :src='`${Main.host}/api/k12/wx/getImage?filePath=${item}`' class="fill-topic-img" />
         <view v-else-if="!isImage(item)" class="text-text">{{ fillAnswer[index] }}</view>
       </view>
     </view>
     <view v-if="question.questionType === QuestionType.TEXT_ANSWER_QUESTION" class="text-answer">
       <view @click="uploadTextAnswer(question)" v-if="question.studentAnswer === null || question.studentAnswer === ''" class="default-view">点击拍照上传</view>
-      <image mode='aspectFit' @click="uploadTextAnswer(question)" v-else-if="isImage(question.studentAnswer)" :src="combineUrl(question.studentAnswer)" alt="" />
+      <image mode='aspectFit' @click="uploadTextAnswer(question)" v-else-if="isImage(question.studentAnswer)" :src="`${Main.host}/api/k12/wx/getImage?filePath=${question.studentAnswer}`" alt="" />
       <view v-else-if="!isImage(question.studentAnswer)" class="text-text" @click="uploadTextAnswer(question)">{{ question.studentAnswer }}</view>
     </view>
     <view v-if="question.questionType === QuestionType.SPOKEN_ANSWER_QUESTION" class="recorder-panel">
@@ -53,13 +53,13 @@
 </template>
 
 <script>
-import Main from '../../lib/Main'
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
 import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam, findExamQuestionList } from '../../lib/Api'
 import { formatQuestionType, formatRichTextImg, beforeAudioRecordOrPlay, afterAudioRecord } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
+import Main from '../../lib/Main'
 export default {
   name: 'TopicBody',
   props: {
@@ -144,6 +144,7 @@ export default {
       oldTime: 0,
       oldSelectedOpts: [],
       isNestedAnswer: null,
+      Main,
     }
   },
   watch: {
@@ -251,10 +252,6 @@ export default {
     }
   },
   mounted() {
-		// if (uni.getStorageSync(Main.userInfo) !== '') {
-		// 	const userInfo = JSON.parse(uni.getStorageSync(Main.userInfo))
-		// 	this.userId = userInfo.userId
-    // }   
     if (this.rm === undefined) {
       this.rm = uni.getRecorderManager()
     }
@@ -296,9 +293,9 @@ export default {
         return false
       }
     },
-    combineUrl(url) {
-      return `${Main.host}/api/k12/wx/getImage?filePath=${url}`
-    },
+    // combineUrl(url) {
+    //   return `https://test.xiaocongkj.com/api/k12/wx/getImage?filePath=${url}`
+    // },
     isNeedUpdateSubmitFlag() {
       if (this.submitFlag === 0) {
         this.$emit('updateSubmitFlag', this.subQuesIndex)
@@ -405,6 +402,7 @@ export default {
 			}
 		},
     toFillAnswer(urls, index) {
+      getApp().globalData.legalHideAction = true
 			uni.navigateTo({
 			  url: `/pages/fillTopicAnswer/fillTopicAnswer?userId=${this.userId}&order=${this.question.order}&examId=${this.examId}&studentId=${this.studentId}&index=${index}&time=${this.time}&urls=${JSON.stringify(urls)}`
 			})

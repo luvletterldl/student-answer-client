@@ -129,7 +129,7 @@ import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -242,7 +242,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=b1b0dc31cc9f4b659e1062b8e592d557&key=U_E_17_11926&userId=11926&studentId=11957&examId=2704&examRecordDataId=3310&mainNum=21&className=0807一班（网考）&courseName=教研0807&currentLessonNumber=网考&isAnswering=true&source=OE&examType=Exercise&questionType=SPOKEN_ANSWER_QUESTION'
+		// const url = 'https://test.xiaocongkj.com/?token=a1b7258493224400a17f1f45051ef2a7&key=U_E_17_11933&userId=11933&studentId=11964&examId=2730&examRecordDataId=3338&mainNum=6&className=0813线上测评1&courseName=undefined&currentLessonNumber=undefined&isAnswering=true&source=OE&examType=K12_ONLINE_EXAM&questionType=FILL_BLANK_QUESTION'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -283,6 +283,17 @@ export default {
 			getApp().globalData.isAnswering = this.isAnswering
 			getApp().globalData.source = source // 全局指定题目来源
 			getApp().globalData.authStatus = this.isAnswering ? true : null // 如果isAnswing是true，则全局验证字段为true
+			// 如果是正在答题中先获取是否需要开启监考，如果需要获取抓拍间隔，如果没有抓拍间隔则不抓拍
+			if (this.isAnswering) {
+				examFaceEnable(this.examId).then((res) => {
+					if (res === 1) {
+						this.faceEnableStatus = true
+						examSnapshotInterval(this.examId).then((res) => {
+							this.snapshotHandler(1)
+						})
+					}
+				})
+			}
 			if (this.account === null) {
 				if (!this.isAnswering && 'account' in p) {
 					this.account = p.account
@@ -343,13 +354,14 @@ export default {
 			checkExamInProgress().then((res) => {
 				uni.hideLoading()
 				console.log('checkExamInProgress', res)
-				if (this.examType === 'K12_ONLINE_EXAM' && res.showSoe !== undefined) {
-					this.showSpokenAnswer = res.showSoe
+				const { showSoe, examId, isExceed, maxInterruptNum, snapshotInterval } = res
+				if (this.examType === 'K12_ONLINE_EXAM' && showSoe !== undefined) {
+					this.showSpokenAnswer = showSoe
 				}
-				if (res.examId === this.examId) {
-					if (res.isExceed) {
+				if (examId === this.examId) {
+					if (isExceed) {
 						uni.showToast({
-							title: `超出最大断点续考次数(${res.maxInterruptNum}),正在自动交卷...`,
+							title: `超出最大断点续考次数(${maxInterruptNum}),正在自动交卷...`,
 							icon: 'none'
 						})
 						setTimeout(() => {
@@ -360,7 +372,14 @@ export default {
 							title: '正在进入断点续考...',
 							icon: 'none'
 						})
-						this.snapshotHandler(res.snapshotInterval)
+						if (this.examRecordDataId === 0) {
+							findExamQuestionList(this.examId, this.userId).then((resp) => {
+								this.examRecordDataId = resp[0].examRecordDataId
+								this.snapshotHandler(snapshotInterval)
+							})
+						} else {
+							this.snapshotHandler(snapshotInterval)
+						}
 						this.continueExam()
 					}
 				} else {
@@ -502,7 +521,7 @@ export default {
 					}
 				})
 				getApp().globalData.currentFillAnswer.order = 0 // 刷新questionList后重置currentFillAnswer
-				console.log('questionList', questionList)
+				console.log('questionList', questionList, this.questionList)
 			} else {
 				return getQuestions(this.examId, this.userId).then((res) => {
 					console.log('getQuestions', res)
@@ -691,6 +710,7 @@ export default {
 			this.showAnswerGuide = false
 			uni.setStorageSync('answerGuide', '1')
 		},
+		// 拍照上传之后评估（uploadExamCapture）
 		takePhoto() {
 			const takePhotoAction = () => {
 				return this.cameraCtx.takePhoto().then((res) => {
@@ -698,7 +718,9 @@ export default {
 					console.log('takePhoto', tempPath)
 					uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
 						console.log('uploadFaceToAliOss', path)
-						uploadExamCapture(this.examRecordDataId, path)
+						if (this.isAnswering) {
+							uploadExamCapture(this.examRecordDataId, this.examId, this.userId, path)
+						}
 					})
 					return res.tempImagePath
 				}).catch((err) => {
@@ -710,7 +732,6 @@ export default {
 			}
 			return takePhotoAction()
 		},
-
 		binderror(e) {
 			console.log('binderror', e)
 			authCameraTips()
@@ -728,6 +749,7 @@ export default {
 				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
 			}
 		},
+		// 抓拍操作
 		snapshotHandler(snapshotInterval) {
 			console.log('snapshotHandler', snapshotInterval)
 			if (snapshotInterval && snapshotInterval > 0) {
@@ -736,7 +758,7 @@ export default {
 					// TODO 每隔minutes分钟抓拍一次
 					this.takePhoto()
 				}, Math.floor(Number(snapshotInterval) * 60) * 1000)
-				// }, Math.floor(1 * 60) * 1000)
+				// }, 10000)
 			}
 		}
 	}

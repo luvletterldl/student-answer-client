@@ -1,12 +1,13 @@
 <template>
   <view class='before-exam-camera'>
     <camera
-      v-if="cameraCtx !== null"
+      v-if="showCamera"
       class="check-face"
       device-position='front'
       flash='off'
+      @error='binderror'
+      @initdone='bindinitdone'
     />
-    <cover-view v-show="cameraCtx === null" class="default-view"></cover-view>
     <cover-image v-if="tempPath !== ''" :src='tempPath' class="temp-photo" />
     <cover-view class="take-photo-tips">请{{ isRepeat }}点击拍照进行人脸验证</cover-view>
     <cover-view class="take-photo-action u-flex u-row-center u-col-center">
@@ -33,26 +34,37 @@ export default {
     initExam: {
       type: Function,
     },
+    onShow: {
+      type: Number,
+      default: false
+    }
+  },
+  watch: {
+    onShow(newStatus, oldStatus) {
+      if (newStatus) {
+        const that = this
+        uni.authorize({
+					scope: 'scope.camera',
+					success(resp) {
+            that.showCamera = true
+            getApp().globalData.legalHideAction = false
+					},
+					fail(err) {
+            that.showCamera = false
+            getApp().globalData.legalHideAction = true
+            authCameraTips()
+					}
+				})
+      }
+    }
   },
   data() {
     return {
       tempPath: '',
       isRepeat: '',
       cameraCtx: null,
+      showCamera: true,
     }
-  },
-  mounted() {
-    const that = this
-    uni.authorize({
-      scope: 'scope.camera',
-      success(res) {
-        that.cameraCtx = uni.createCameraContext()
-      },
-      fail(err) {
-        console.log('authorize fail', err)
-        authCameraTips()
-      }
-    })
   },
   methods: {
     reTakePhoto() {
@@ -88,6 +100,13 @@ export default {
         })
       })
     },
+    binderror(e) {
+      console.log('binderror', e)
+      authCameraTips()
+    },
+    bindinitdone(e) {
+      console.log('bindinitdone', e)
+    }
   }
 }
 </script>

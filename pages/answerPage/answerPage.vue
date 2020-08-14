@@ -110,6 +110,7 @@
 			:examRecordDataId='examRecordDataId'
 			:account='account'
 			:cameraCtx='cameraCtx'
+			:onShow='invokeBeforeExamCameraShow'
 			v-on:initExam='initExam'
 		/>
 	</view>
@@ -127,7 +128,7 @@ import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -186,9 +187,9 @@ export default {
 			cameraCtx: null, // 获取相机实例
 			cameraTop: '0vh', // 悬浮相机距离顶部距离
 			cameraRight: '0vw', // 悬浮相机距离右侧距离
-			beforeExamFaceEnable: false, // 是否开启监考
-			beforeExamFaceCheck: false, // 是否要在登录后考试前进行人脸检查
+			faceEnableStatus: false, // 是否开启监考
 			faceCheckStatus: false, // 人脸检测是否展示
+			invokeBeforeExamCameraShow: 0, // 通过在BeforeExamCamera中监听此状态是否变化来展示camera组件
 		}
 	},
 	computed: {
@@ -240,7 +241,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=29cc010c6cd44d43885f83fbdc0eef71&key=U_E_17_11933&userId=11933&studentId=11964&examId=2686&mainNum=1&className=0731一班&courseName=0731教研一（考试）&currentLessonNumber=第3课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false'
+		const url = 'https://test.xiaocongkj.com/?token=497fb9a8834346a68f31e5d003ad6977&key=U_E_17_11933&userId=11933&studentId=11964&examId=2674&mainNum=1&className=0731一班&courseName=0731教研一（考试）&currentLessonNumber=第2课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false'
 		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -299,6 +300,9 @@ export default {
 			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
 			this.updateQuestionList(params)
 		}
+		if (this.faceCheckStatus) {
+			this.invokeBeforeExamCameraShow += 1
+		}
 	},
   beforeDestroy() {
 		clearInterval(this.timer)
@@ -334,7 +338,9 @@ export default {
 		},
 		// 检测当前考试是否需要断点续考
 		examInProgressHandler() {
+			uni.showLoading()
 			checkExamInProgress().then((res) => {
+				uni.hideLoading()
 				console.log('checkExamInProgress', res)
 				if (this.examType === 'K12_ONLINE_EXAM' && res.showSoe !== undefined) {
 					this.showSpokenAnswer = res.showSoe
@@ -359,7 +365,7 @@ export default {
 				} else {
 					this.startOrRestartAction()
 				}
-			})
+			}).catch(() => { uni.hideLoading() })
 		},
 		// 继续考试
 		continueExam() {
@@ -383,14 +389,17 @@ export default {
 		},
 		// 开始或者重做
     startOrRestartAction() {
+			uni.showLoading()
       if (this.restart === true) {
       	restartExam(this.examId, this.userId).then((res) => {
+					uni.hideLoading()
       		this.startOrRestartExamCallback(res)
-      	})
+      	}).catch(() => { uni.hideLoading() })
       } else {
       	startExam(this.examId, this.userId).then((res) => {
+					uni.hideLoading()
       		this.startOrRestartExamCallback(res)
-      	})
+      	}).catch(() => { uni.hideLoading() })
       }
 		},
 		// 重做
@@ -639,36 +648,31 @@ export default {
 			})
 		},
 		// 用户认证成功回调
-		authLoginSuccess() {
+		authLoginSuccess(faceEnable) {
 			// 如果需要考试前认证先不初始化
 			this.needLogin = false
-			uni.showLoading()
 			// 检查考试是否需要开启监考，是否需要开启人脸检查
-			examFaceEnable(2709).then((res) => {
-				console.log('examFaceEnable', res)
-				if (res === 1) {
-					const that = this
-					uni.authorize({
-						scope: 'scope.camera',
-						success(res) {
-							that.cameraCtx = uni.createCameraContext()
-						},
-						fail(err) {
-							console.log('authorize fail', err)
-							authCameraTips()
-						}
-					})
-					examFaceCheck(2709).then((res) => {
-						console.log('examFaceCheck', res)
-						if (res === 1) {
-							this.faceCheckStatus = true
-						}
-					})
-				} else {
-					this.initExam()
-				}
-				uni.hideLoading()
-			})
+			console.log('authLoginSuccess', faceEnable)
+			if (faceEnable) {
+				uni.authorize({
+					scope: 'scope.camera',
+					success(resp) {
+						getApp().globalData.legalHideAction = false
+					},
+					fail(err) {
+						getApp().globalData.legalHideAction = true
+					}
+				})
+				this.faceEnableStatus = true
+				examFaceCheck(2709).then((res) => {
+					console.log('examFaceCheck', res)
+					if (res === 1) {
+						this.faceCheckStatus = true
+					}
+				})
+			} else {
+				this.initExam()
+			}
 		},
 		// 考试引导
 		startAnswerGuide() {
@@ -692,6 +696,7 @@ export default {
 					console.log('takePhoto', tempPath)
 					uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
 						console.log('uploadFaceToAliOss', path)
+						uploadExamCapture(this.examRecordDataId, path)
 					})
 					return res.tempImagePath
 				}).catch((err) => {

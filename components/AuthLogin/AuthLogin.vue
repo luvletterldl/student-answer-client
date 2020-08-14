@@ -10,7 +10,8 @@
 </template>
 
 <script>
-import { clientOELogin, header } from '../../lib/Api'
+import { clientOELogin, header, examFaceEnable } from '../../lib/Api'
+import { authCameraTips } from '../../lib/Utils'
 export default {
   name: 'AuthLogin',
   props: {
@@ -24,6 +25,9 @@ export default {
     },
     authLoginSuccess: {
       type: Function,
+    },
+    examId: {
+      type: Number,
     }
   },
   data() {
@@ -40,6 +44,7 @@ export default {
         })
         return
       } else {
+        uni.showLoading({ title: '登录中...' })
         clientOELogin(this.account, this.password).then((res) => {
           console.log('clientLogin', res)
           // console.log(res)
@@ -58,11 +63,31 @@ export default {
           //   return
           } else {
             // 如果是OE还是用二维码中的token
+            uni.hideLoading()
             const { key, token } = res.user
             header.key = key
             header.token = token
             getApp().globalData.authStatus = true
-            this.$emit('authLoginSuccess')
+            let faceEnable = false
+            // examFaceEnable(this.examId).then((res) => {
+            examFaceEnable(2709).then((res) => {
+              console.log('examFaceEnable', res)
+              if (res === 1) {
+                faceEnable = true
+                const that = this
+                // uni.authorize({
+                //   scope: 'scope.camera',
+                //   success(resp) {
+                //     getApp().globalData.legalHideAction = false
+                //   },
+                //   fail(err) {
+                //     console.log('authorize fail', err)
+                //     getApp().globalData.legalHideAction = true
+                //   }
+                // })
+              }
+              this.$emit('authLoginSuccess', faceEnable) 
+            })
           }
         })
       }

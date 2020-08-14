@@ -87,6 +87,7 @@
 		</view>
 		<auth-login
 			:account='account'
+			:examId='examId'
 			:needLogin='needLogin'
 			v-on:authLoginSuccess='authLoginSuccess'
 		/>
@@ -241,8 +242,8 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=497fb9a8834346a68f31e5d003ad6977&key=U_E_17_11933&userId=11933&studentId=11964&examId=2674&mainNum=1&className=0731一班&courseName=0731教研一（考试）&currentLessonNumber=第2课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false'
-		// const url = decodeURIComponent(options.q)
+		// const url = 'https://test.xiaocongkj.com/?token=b1b0dc31cc9f4b659e1062b8e592d557&key=U_E_17_11926&userId=11926&studentId=11957&examId=2704&examRecordDataId=3310&mainNum=21&className=0807一班（网考）&courseName=教研0807&currentLessonNumber=网考&isAnswering=true&source=OE&examType=Exercise&questionType=SPOKEN_ANSWER_QUESTION'
+		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
@@ -664,7 +665,8 @@ export default {
 					}
 				})
 				this.faceEnableStatus = true
-				examFaceCheck(2709).then((res) => {
+				// examFaceCheck(2709).then((res) => {
+				examFaceCheck(this.examId).then((res) => {
 					console.log('examFaceCheck', res)
 					if (res === 1) {
 						this.faceCheckStatus = true
@@ -727,13 +729,13 @@ export default {
 			}
 		},
 		snapshotHandler(snapshotInterval) {
-			// if (snapshotInterval && snapshotInterval > 0) {
 			console.log('snapshotHandler', snapshotInterval)
-			if (true) {
+			if (snapshotInterval && snapshotInterval > 0) {
+			// if (true) {
 				this.snapshotTimer = setInterval(() => {
 					// TODO 每隔minutes分钟抓拍一次
 					this.takePhoto()
-				}, Math.floor(100 * 60))
+				}, Math.floor(Number(snapshotInterval) * 60) * 1000)
 				// }, Math.floor(1 * 60) * 1000)
 			}
 		}

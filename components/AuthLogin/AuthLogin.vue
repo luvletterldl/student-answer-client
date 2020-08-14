@@ -69,8 +69,9 @@ export default {
             header.token = token
             getApp().globalData.authStatus = true
             let faceEnable = false
-            // examFaceEnable(this.examId).then((res) => {
-            examFaceEnable(2709).then((res) => {
+            console.log(this.examId)
+            examFaceEnable(this.examId).then((res) => {
+            // examFaceEnable(2709).then((res) => {
               console.log('examFaceEnable', res)
               if (res === 1) {
                 faceEnable = true

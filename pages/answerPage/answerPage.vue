@@ -102,6 +102,7 @@
 				class="capture-face"
 				device-position='front'
 				flash='off'
+				resolution='low'
 				@error='binderror'
 				@initdone='bindinitdone'
 			/>
@@ -242,7 +243,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=a1b7258493224400a17f1f45051ef2a7&key=U_E_17_11933&userId=11933&studentId=11964&examId=2730&examRecordDataId=3338&mainNum=6&className=0813线上测评1&courseName=undefined&currentLessonNumber=undefined&isAnswering=true&source=OE&examType=K12_ONLINE_EXAM&questionType=FILL_BLANK_QUESTION'
+		// const url = 'https://test.xiaocongkj.com/?token=4467f31315004d32bcbd097793c365a8&key=U_E_17_11933&userId=11933&studentId=11964&examId=2704&mainNum=1&className=0807一班（网考）&courseName=教研0807¤tLessonNumber=网考&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=true'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -280,19 +281,14 @@ export default {
 			this.canRestart = ['Assignment', 'Preview', 'Enter', 'Exercise'].includes(this.examType) ? true : false
 			this.restart = 'restart' in p && p.restart === 'true' ? true : null // 如果restart是true，则赋值
 			this.questionType = 'questionType' in p && this.isAnswering ? p.questionType : ''
+			Main.examId = this.examId
+			Main.userId = this.userId
 			getApp().globalData.isAnswering = this.isAnswering
 			getApp().globalData.source = source // 全局指定题目来源
 			getApp().globalData.authStatus = this.isAnswering ? true : null // 如果isAnswing是true，则全局验证字段为true
 			// 如果是正在答题中先获取是否需要开启监考，如果需要获取抓拍间隔，如果没有抓拍间隔则不抓拍
 			if (this.isAnswering) {
-				examFaceEnable(this.examId).then((res) => {
-					if (res === 1) {
-						this.faceEnableStatus = true
-						examSnapshotInterval(this.examId).then((res) => {
-							this.snapshotHandler(1)
-						})
-					}
-				})
+				this.judgeIsSnapshot()
 			}
 			if (this.account === null) {
 				if (!this.isAnswering && 'account' in p) {
@@ -308,6 +304,7 @@ export default {
 	},
 	onShow() {
 		const currentFillAnswer = getApp().globalData.currentFillAnswer
+		getApp().globalData.legalHideAction = false
 		if (currentFillAnswer.order !== 0) {
 			const params = JSON.stringify({order: currentFillAnswer.order, studentAnswer: currentFillAnswer.studentAnswer})
 			this.updateQuestionList(params)
@@ -317,9 +314,7 @@ export default {
 		}
 	},
   beforeDestroy() {
-		clearInterval(this.timer)
-		clearInterval(this.countdownTimer)
-		clearInterval(this.snapshotTimer)
+		this.clearIntervals()
   },
 	methods: {
 		// 考试初始化
@@ -375,10 +370,10 @@ export default {
 						if (this.examRecordDataId === 0) {
 							findExamQuestionList(this.examId, this.userId).then((resp) => {
 								this.examRecordDataId = resp[0].examRecordDataId
-								this.snapshotHandler(snapshotInterval)
+								this.judgeIsSnapshot()
 							})
 						} else {
-							this.snapshotHandler(snapshotInterval)
+							this.judgeIsSnapshot()
 						}
 						this.continueExam()
 					}
@@ -424,8 +419,7 @@ export default {
 		},
 		// 重做
 		restartAction(isEndExam) {
-			clearInterval(this.countdownTimer)
-			clearInterval(this.timer)
+			this.clearIntervals()
 			if (isEndExam) {
 				restartExam(this.examId, this.userId).then((resp) => {
 					this.questionList = []
@@ -440,8 +434,7 @@ export default {
 					content: '当前答案会被上交，确定要重做吗？',
 					success: (res) => {
 						if (res.confirm) {
-							clearInterval(this.timer)
-							clearInterval(this.countdownTimers)
+							this.clearIntervals()
 							console.log('confirm')
 							this.endExamAction(true).then(() => {
 								restartExam(this.examId, this.userId).then((resp) => {
@@ -469,7 +462,7 @@ export default {
 				const { examRecordDataId, duration, showSoe, snapshotInterval } = res
 				this.examRecordDataId = examRecordDataId
 				this.duration = duration
-				this.snapshotHandler(snapshotInterval)
+				this.judgeIsSnapshot()
 				if (this.examType === 'K12_ONLINE_EXAM') {
 					this.showSpokenAnswer = showSoe
 				}
@@ -539,7 +532,12 @@ export default {
 									const filteredSubQuesList = subQuesList.filter((subQues) => {
 										if (subQues.questionType === type) return subQues
 									})
-									if (filteredSubQuesList.length > 0) return filteredSubQuesList
+									console.log('filteredSubQuesList', filteredSubQuesList)
+									// if (filteredSubQuesList.length > 0) return filteredSubQuesList
+									if (filteredSubQuesList.length > 0) {
+										question.subQuestions = filteredSubQuesList
+										return question
+									}
 								} else if (question.questionType === type) {
 									return question
 								}
@@ -627,8 +625,7 @@ export default {
 					return
 				} else {
 					uni.showToast({ title: '提交成功', icon: 'success' })
-					clearInterval(this.countdownTimer)
-					clearInterval(this.timer)
+					this.clearIntervals()
 					if (!unShowExit) {
 						this.showExitBtnAction()
 						getApp().globalData.authStatus = null
@@ -695,6 +692,12 @@ export default {
 				this.initExam()
 			}
 		},
+		// 清除定时器
+		clearIntervals() {
+			clearInterval(this.timer)
+			clearInterval(this.countdownTimer)
+			clearInterval(this.snapshotTimer)
+		},
 		// 考试引导
 		startAnswerGuide() {
 			this.showAnswerGuide = true
@@ -718,7 +721,7 @@ export default {
 					console.log('takePhoto', tempPath)
 					uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
 						console.log('uploadFaceToAliOss', path)
-						if (this.isAnswering) {
+						if (getApp().globalData.authStatus) {
 							uploadExamCapture(this.examRecordDataId, this.examId, this.userId, path)
 						}
 					})
@@ -748,6 +751,17 @@ export default {
 				this.cameraRight = x >= 0.8 * windowWidth ? '0vw' : x <= 0.2 * windowWidth ? '80vw' : Math.floor(((windowWidth - x) / windowWidth) * 100) + 'vw'
 				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
 			}
+		},
+		// 判断当前考试要不要开启抓拍
+		judgeIsSnapshot() {
+			examFaceEnable(this.examId).then((res) => {
+				if (res === 1) {
+					this.faceEnableStatus = true
+					examSnapshotInterval(this.examId).then((snapshotInterval) => {
+						this.snapshotHandler(snapshotInterval)
+					})
+				}
+			})
 		},
 		// 抓拍操作
 		snapshotHandler(snapshotInterval) {

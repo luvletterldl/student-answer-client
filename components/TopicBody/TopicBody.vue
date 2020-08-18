@@ -505,7 +505,7 @@ export default {
       uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
         const data = JSON.parse(res)
         console.log('uploadMp3ToAliOss', data)
-        if (data.code !== undefined) {
+        if (data.code !== undefined && data.code !== '0') {
           uni.hideLoading()
           uni.showModal({
             title: '提示',

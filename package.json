@@ -12,7 +12,5 @@
   "dependencies": {
     "uview-ui": "^1.5.0"
   },
-  "devDependencies": {
-    "dayjs": "^1.8.29"
-  }
+  "devDependencies": {}
 }

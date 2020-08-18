@@ -7,7 +7,6 @@
 </template>
 
 <script>
-import dayjs from 'dayjs'
 import { formatSecondToHHmmss, afterAudioPlay, beforeAudioRecordOrPlay } from '../../lib/Utils'
 const iconPaused = '../../static/images/icon_paused.png'
 const iconPlaying = '../../static/images/icon_playing.png'

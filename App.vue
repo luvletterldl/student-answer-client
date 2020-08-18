@@ -1,5 +1,6 @@
 <script>
-import { unLockTerminal } from './lib/Api'
+import { unLockTerminal, listeningOnHideInExam } from './lib/Api'
+import Main from './lib/Main'
 export default {
 	globalData: {  
 		authStatus: null,
@@ -16,15 +17,21 @@ export default {
 		source: '', // 题目来源 OA: 公众号 OE：PC网考
 		hasHideAction: false, // 考试过程中如果有切屏，分屏，悬浮行为的话，设定为true并弹出警告
 		legalHideAction: false, // 是否属于合法的隐藏操作
+		onHideLeaveTime: 0, // 小程序切到后台时记录下时间戳（秒）
+		// onShowReturnTime: 0, // 小程序切回前台时记录下时间戳（秒）
 	}, 
 	onLaunch: function() {
 		console.log('App Launch');
 	},
 	onShow: function() {
-		const { authStatus, hasHideAction, legalHideAction, isAnswering } = this.$scope.globalData
+		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, onHideLeaveTime } = this.$scope.globalData
 		console.log('App Show', isAnswering);
 		if (authStatus === true && hasHideAction === true && !legalHideAction) {
 			if (!isAnswering) {
+				const returnTime = Math.floor(Date.now() / 1000)
+				listeningOnHideInExam(onHideLeaveTime, returnTime, returnTime - onHideLeaveTime, null, Main.examId, examRecordDataId, Main.userId).then((res) => {
+					console.log('listeningOnHideInExam', res)
+				})
 				uni.showModal({
 					title: '提示',
 					content: '考试过程中严禁使用分屏、切屏或浮窗等功能，您的行为已违规被记录，请谨慎操作！',
@@ -41,6 +48,7 @@ export default {
 	onHide: function() {
 		console.log('App Hide');
 		this.$scope.globalData.hasHideAction = true
+		this.$scope.globalData.onHideLeaveTime = Math.floor(Date.now() / 1000)
 		const { isAnswering, examRecordDataId, legalHideAction } = this.$scope.globalData
 		// 如果合法操作就不触发unLock
 		if (isAnswering && examRecordDataId !== 0 && legalHideAction === false) {
@@ -50,7 +58,15 @@ export default {
 				}
 			})
 		}
-	}
+	},
+  onUnload: function() {
+    console.log('App Unload')
+    unLockTerminal(this.$scope.globalData.examRecordDataId).then((res) => {
+    	if (res.code === '0') {
+    		this.$scope.globalData.authStatus = false // 触发showExitBtn
+    	}
+    })
+  }
 };
 </script>
 

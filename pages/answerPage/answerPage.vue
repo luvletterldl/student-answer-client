@@ -243,7 +243,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=4467f31315004d32bcbd097793c365a8&key=U_E_17_11933&userId=11933&studentId=11964&examId=2704&mainNum=1&className=0807一班（网考）&courseName=教研0807¤tLessonNumber=网考&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=true'
+		// const url = 'https://test.xiaocongkj.com/?token=18d42207872a461896f80380a1b67e43&key=U_E_17_11927&userId=11927&studentId=11958&examId=2741&mainNum=1&className=测试是否开启人脸识别&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=13886110283&source=OE&examType=K12_ONLINE_EXAM&restart=false'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -684,9 +684,7 @@ export default {
 				// examFaceCheck(2709).then((res) => {
 				examFaceCheck(this.examId).then((res) => {
 					console.log('examFaceCheck', res)
-					if (res === 1) {
-						this.faceCheckStatus = true
-					}
+					res === 1 ? this.faceCheckStatus = true : this.initExam()
 				})
 			} else {
 				this.initExam()
@@ -714,17 +712,19 @@ export default {
 			uni.setStorageSync('answerGuide', '1')
 		},
 		// 拍照上传之后评估（uploadExamCapture）
-		takePhoto() {
+		takePhoto(needUpload = true) {
 			const takePhotoAction = () => {
 				return this.cameraCtx.takePhoto().then((res) => {
 					const tempPath = res.tempImagePath
 					console.log('takePhoto', tempPath)
-					uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
-						console.log('uploadFaceToAliOss', path)
-						if (getApp().globalData.authStatus) {
-							uploadExamCapture(this.examRecordDataId, this.examId, this.userId, path)
-						}
-					})
+					if (needUpload) {
+						uploadFaceToAliOss(this.examRecordDataId, tempPath).then((path) => {
+							console.log('uploadFaceToAliOss', path)
+							if (getApp().globalData.authStatus) {
+								uploadExamCapture(this.examRecordDataId, this.examId, this.userId, path)
+							}
+						})
+					}
 					return res.tempImagePath
 				}).catch((err) => {
 					console.log('takePhoto Err', err)
@@ -768,6 +768,7 @@ export default {
 			console.log('snapshotHandler', snapshotInterval)
 			if (snapshotInterval && snapshotInterval > 0) {
 			// if (true) {
+				this.takePhoto(false)
 				this.snapshotTimer = setInterval(() => {
 					// TODO 每隔minutes分钟抓拍一次
 					this.takePhoto()

@@ -276,8 +276,8 @@ export default {
 			this.userId = Number(userId)
 			this.isAnswering = isAnswering === 'true' ? true : isAnswering === 'false' ? false : null
 			this.source = source
-			// 如果属于预习，作业，进门测，课堂练习中的一种则当前考试可以重做
 			this.examType = 'examType' in p ? p.examType : ''
+			// 如果属于预习，作业，进门测，课堂练习中的一种则当前考试可以重做
 			this.canRestart = ['Assignment', 'Preview', 'Enter', 'Exercise'].includes(this.examType) ? true : false
 			this.restart = 'restart' in p && p.restart === 'true' ? true : null // 如果restart是true，则赋值
 			this.questionType = 'questionType' in p && this.isAnswering ? p.questionType : ''
@@ -533,7 +533,6 @@ export default {
 										if (subQues.questionType === type) return subQues
 									})
 									console.log('filteredSubQuesList', filteredSubQuesList)
-									// if (filteredSubQuesList.length > 0) return filteredSubQuesList
 									if (filteredSubQuesList.length > 0) {
 										question.subQuestions = filteredSubQuesList
 										return question
@@ -670,7 +669,7 @@ export default {
 			this.needLogin = false
 			// 检查考试是否需要开启监考，是否需要开启人脸检查
 			console.log('authLoginSuccess', faceEnable)
-			if (faceEnable) {
+			if (faceEnable && !this.restart) {
 				uni.authorize({
 					scope: 'scope.camera',
 					success(resp) {
@@ -754,14 +753,18 @@ export default {
 		},
 		// 判断当前考试要不要开启抓拍
 		judgeIsSnapshot() {
-			examFaceEnable(this.examId).then((res) => {
-				if (res === 1) {
-					this.faceEnableStatus = true
-					examSnapshotInterval(this.examId).then((snapshotInterval) => {
-						this.snapshotHandler(snapshotInterval)
-					})
-				}
-			})
+			if (this.restart) {
+				return
+			} else {
+				examFaceEnable(this.examId).then((res) => {
+					if (res === 1) {
+						this.faceEnableStatus = true
+						examSnapshotInterval(this.examId).then((snapshotInterval) => {
+							this.snapshotHandler(snapshotInterval)
+						})
+					}
+				})
+			}
 		},
 		// 抓拍操作
 		snapshotHandler(snapshotInterval) {

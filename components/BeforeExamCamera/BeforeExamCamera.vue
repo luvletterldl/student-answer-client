@@ -19,13 +19,19 @@
 </template>
 
 <script>
-import { header, uploadImageToAliOss, comparePortrait } from '../../lib/Api'
+import { header, uploadFaceCheckImageToAliOss, compareFaceSync, uploadFaceCheckServeCallback } from '../../lib/Api'
 import { authCameraTips } from '../../lib/Utils'
 import Main from '../../lib/Main'
 export default {
   name: 'BeforeExamCamera',
   props: {
     examRecordDataId: {
+      type: Number,
+    },
+    examId: {
+      type: Number,
+    },
+    userId: {
       type: Number,
     },
     account: {
@@ -37,7 +43,7 @@ export default {
     onShow: {
       type: Number,
       default: false
-    }
+    },
   },
   watch: {
     onShow(newStatus, oldStatus) {
@@ -81,20 +87,18 @@ export default {
     },
     usePhoto() {
       uni.showLoading()
-      uploadImageToAliOss(this.examRecordDataId, this.tempPath).then((path) => {
+      uploadFaceCheckImageToAliOss(this.examRecordDataId, this.tempPath).then((path) => {
         console.log('uploadImageToAliOss', path)
         const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
         this.tempPath = ''
-        comparePortrait(this.account, url).then((resp) => {
-          console.log('comparePortrait', resp)
-          if (resp.code) {
-            this.isRepeat = '重新'
-          } else {
-            const { key, token } = resp.user
-            header.key = key
-            header.token = token
+        compareFaceSync(url, this.userId, this.examId).then((resp) => {
+          console.log('compareFaceSync', resp)
+          if (resp.isPass) {
             getApp().globalData.authStatus = true
+            uploadFaceCheckServeCallback(resp)
             this.$emit('initExam')
+          } else {
+            this.isRepeat = '重新'
           }
           uni.hideLoading()
         })

@@ -96,9 +96,9 @@
 			v-on:answerGuideChangeStep='answerGuideChangeStep'
 			v-on:hideAnswerGuide='hideAnswerGuide'
 		/>
-		<cover-view v-if="cameraCtx !== null && !faceCheckStatus" @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="snap-camera">
+		<cover-view v-if="cameraCtx !== null && !faceCheckStatus && faceSnapshot" @touchmove='cameraTouchMove' :style='{top: cameraTop, right: cameraRight}' class="snap-camera">
 			<camera
-				v-if="cameraCtx !== null && !faceCheckStatus"
+				v-if="cameraCtx !== null && !faceCheckStatus && faceSnapshot"
 				class="capture-face"
 				device-position='front'
 				flash='off'
@@ -109,6 +109,8 @@
 		</cover-view>
 		<before-exam-camera
 			v-if="faceCheckStatus"
+			:examId='examId'
+			:userId='userId'
 			:examRecordDataId='examRecordDataId'
 			:account='account'
 			:cameraCtx='cameraCtx'
@@ -130,7 +132,7 @@ import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
 import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, comparePortrait, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -191,6 +193,7 @@ export default {
 			cameraRight: '0vw', // 悬浮相机距离右侧距离
 			faceEnableStatus: false, // 是否开启监考
 			faceCheckStatus: false, // 人脸检测是否展示
+			faceSnapshot: false, // 是否开启抓拍
 			invokeBeforeExamCameraShow: 0, // 通过在BeforeExamCamera中监听此状态是否变化来展示camera组件
 		}
 	},
@@ -243,7 +246,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=18d42207872a461896f80380a1b67e43&key=U_E_17_11927&userId=11927&studentId=11958&examId=2741&mainNum=1&className=测试是否开启人脸识别&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=13886110283&source=OE&examType=K12_ONLINE_EXAM&restart=false'
+		// const url = 'https://test.xiaocongkj.com/?token=862deaef77f14da7b6f562edbaf2db92&key=U_E_17_11926&userId=11926&studentId=11957&examId=2771&mainNum=1&className=0814一班&courseName=0813教研二&currentLessonNumber=第3课次&isAnswering=false&account=15911111103&source=OE&examType=K12_ONLINE_EXAM&restart=false'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -670,6 +673,7 @@ export default {
 			// 检查考试是否需要开启监考，是否需要开启人脸检查
 			console.log('authLoginSuccess', faceEnable)
 			if (faceEnable && !this.restart) {
+				const that = this
 				uni.authorize({
 					scope: 'scope.camera',
 					success(resp) {
@@ -677,6 +681,7 @@ export default {
 					},
 					fail(err) {
 						getApp().globalData.legalHideAction = true
+						authCameraTips()
 					}
 				})
 				this.faceEnableStatus = true
@@ -736,9 +741,11 @@ export default {
 		},
 		binderror(e) {
 			console.log('binderror', e)
+			this.cameraCtx = null
 			authCameraTips()
 		},
 		bindinitdone(e) {
+			this.cameraCtx = uni.createCameraContext()
 			console.log('bindinitdone', e)
 		},
 		// 相机移动事件处理
@@ -771,11 +778,12 @@ export default {
 			console.log('snapshotHandler', snapshotInterval)
 			if (snapshotInterval && snapshotInterval > 0) {
 			// if (true) {
+				this.faceSnapshot = true
 				this.takePhoto(false)
 				this.snapshotTimer = setInterval(() => {
 					// TODO 每隔minutes分钟抓拍一次
 					this.takePhoto()
-				}, Math.floor(Number(snapshotInterval) * 60) * 1000)
+				}, Math.floor(Number(0.2) * 60) * 1000)
 				// }, 10000)
 			}
 		}

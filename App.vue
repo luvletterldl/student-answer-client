@@ -1,9 +1,10 @@
 <script>
 import { unLockTerminal, listeningOnHideInExam } from './lib/Api'
 import Main from './lib/Main'
+import { ExamType } from './lib/Enumerate';
 export default {
 	globalData: {  
-		authStatus: null,
+		authStatus: null, // 认证状态
 		// 保证全局只有一个音频处于播放状态且录音与播放操作互斥
 		audioPlaying: false,
 		audioRecording: false,
@@ -14,6 +15,7 @@ export default {
 		isAnswering: null, // 其他终端是否正在考试中
 		examRecordDataId: 0,
 		currentQuestionType: '', // 当前题目类型
+		currentExamType: '', // 当前考试类型
 		source: '', // 题目来源 OA: 公众号 OE：PC网考
 		hasHideAction: false, // 考试过程中如果有切屏，分屏，悬浮行为的话，设定为true并弹出警告
 		legalHideAction: false, // 是否属于合法的隐藏操作
@@ -24,9 +26,9 @@ export default {
 		console.log('App Launch');
 	},
 	onShow: function() {
-		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, onHideLeaveTime } = this.$scope.globalData
+		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, currentExamType, onHideLeaveTime } = this.$scope.globalData
 		console.log('App Show', isAnswering);
-		if (authStatus === true && hasHideAction === true && !legalHideAction) {
+		if (authStatus === true && hasHideAction === true && !legalHideAction && currentExamType === ExamType.K12_ONLINE_EXAM) {
 			if (!isAnswering) {
 				const returnTime = Math.floor(Date.now() / 1000)
 				listeningOnHideInExam(onHideLeaveTime, returnTime, returnTime - onHideLeaveTime, null, Main.examId, examRecordDataId, Main.userId).then((res) => {

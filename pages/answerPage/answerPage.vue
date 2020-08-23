@@ -129,10 +129,10 @@ import AuthLogin from '../../components/AuthLogin/AuthLogin'
 import AnswerGuide from '../../components/CustomGuide/AnswerGuide'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera'
-import { QuestionType, ChoiceOption } from '../../lib/Enumerate';
+import { QuestionType, ChoiceOption, ExamType } from '../../lib/Enumerate';
 import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
-import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval } from '../../lib/Api'
+import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval, uploadFaceCheckServeCallback } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
@@ -195,6 +195,7 @@ export default {
 			faceCheckStatus: false, // 人脸检测是否展示
 			faceSnapshot: false, // 是否开启抓拍
 			invokeBeforeExamCameraShow: 0, // 通过在BeforeExamCamera中监听此状态是否变化来展示camera组件
+			compareFaceResponse: undefined, // 对比人脸之后返回的数据
 		}
 	},
 	computed: {
@@ -246,7 +247,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=862deaef77f14da7b6f562edbaf2db92&key=U_E_17_11926&userId=11926&studentId=11957&examId=2771&mainNum=1&className=0814一班&courseName=0813教研二&currentLessonNumber=第3课次&isAnswering=false&account=15911111103&source=OE&examType=K12_ONLINE_EXAM&restart=false'
+		// const url = 'https://test.xiaocongkj.com/?token=335e7b0301164d6ea9069ab6e4b63aeb&key=U_E_17_11939&userId=11939&studentId=11971&examId=2867&mainNum=1&className=0821线上测评2&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=15911111116&source=OE&examType=K12_ONLINE_EXAM&restart=false'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -281,12 +282,13 @@ export default {
 			this.source = source
 			this.examType = 'examType' in p ? p.examType : ''
 			// 如果属于预习，作业，进门测，课堂练习中的一种则当前考试可以重做
-			this.canRestart = ['Assignment', 'Preview', 'Enter', 'Exercise'].includes(this.examType) ? true : false
+			this.canRestart = this.examType in ExamType ? true : false
 			this.restart = 'restart' in p && p.restart === 'true' ? true : null // 如果restart是true，则赋值
 			this.questionType = 'questionType' in p && this.isAnswering ? p.questionType : ''
 			Main.examId = this.examId
 			Main.userId = this.userId
-			getApp().globalData.isAnswering = this.isAnswering
+			getApp().globalData.currentExamType = this.examType // 全局设置当前考试类型
+			getApp().globalData.isAnswering = this.isAnswering // 全局设置当前考试是否是其他终端正在作答中
 			getApp().globalData.source = source // 全局指定题目来源
 			getApp().globalData.authStatus = this.isAnswering ? true : null // 如果isAnswing是true，则全局验证字段为true
 			// 如果是正在答题中先获取是否需要开启监考，如果需要获取抓拍间隔，如果没有抓拍间隔则不抓拍
@@ -321,8 +323,11 @@ export default {
   },
 	methods: {
 		// 考试初始化
-		initExam() {
+		initExam(resp) {
 			this.faceCheckStatus = false
+			if (resp) {
+				this.compareFaceResponse = resp
+			}
 			if (this.source === 'OE' && this.isAnswering) {
 				if (this.examRecordDataId === 0) {
 					findExamQuestionList(this.examId, this.userId).then((res) => {
@@ -338,8 +343,15 @@ export default {
 				this.examInProgressHandler()
 			}
 		},
+		updateCompareFaceResponseExamRecordDataId() {
+			if (this.compareFaceResponse !== undefined && this.examRecordDataId !== 0) {
+				this.compareFaceResponse.examRecordDataId = this.examRecordDataId
+				uploadFaceCheckServeCallback(this.compareFaceResponse)
+			}
+		},
 		// 锁终端操作，成功后继续考试
 		lockTerminalAction() {
+			this.updateCompareFaceResponseExamRecordDataId()
 			lockTerminalLock(this.userId, this.studentId, this.examId, this.examRecordDataId, this.examType, this.questionType).then((resp) => {
 				console.log('lockTerminalLock', resp)
 				// 加锁成功后加载考试的数据，开始作答
@@ -353,7 +365,7 @@ export default {
 				uni.hideLoading()
 				console.log('checkExamInProgress', res)
 				const { showSoe, examId, isExceed, maxInterruptNum, snapshotInterval } = res
-				if (this.examType === 'K12_ONLINE_EXAM' && showSoe !== undefined) {
+				if (this.examType === ExamType.K12_ONLINE_EXAM && showSoe !== undefined) {
 					this.showSpokenAnswer = showSoe
 				}
 				if (examId === this.examId) {
@@ -374,9 +386,11 @@ export default {
 							findExamQuestionList(this.examId, this.userId).then((resp) => {
 								this.examRecordDataId = resp[0].examRecordDataId
 								this.judgeIsSnapshot()
+								this.updateCompareFaceResponseExamRecordDataId()
 							})
 						} else {
 							this.judgeIsSnapshot()
+							this.updateCompareFaceResponseExamRecordDataId()
 						}
 						this.continueExam()
 					}
@@ -466,7 +480,7 @@ export default {
 				this.examRecordDataId = examRecordDataId
 				this.duration = duration
 				this.judgeIsSnapshot()
-				if (this.examType === 'K12_ONLINE_EXAM') {
+				if (this.examType === ExamType.K12_ONLINE_EXAM) {
 					this.showSpokenAnswer = showSoe
 				}
 				if (duration > 0) {
@@ -783,7 +797,7 @@ export default {
 				this.snapshotTimer = setInterval(() => {
 					// TODO 每隔minutes分钟抓拍一次
 					this.takePhoto()
-				}, Math.floor(Number(0.2) * 60) * 1000)
+				}, Math.floor(Number(snapshotInterval) * 60) * 1000)
 				// }, 10000)
 			}
 		}

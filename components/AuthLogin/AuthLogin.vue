@@ -52,18 +52,30 @@ export default {
             // 如果是OE还是用二维码中的token
             uni.hideLoading()
             const { key, token } = res.user
+            const portrait = res.student.portrait
             header.key = key
             header.token = token
             getApp().globalData.authStatus = true
             let faceEnable = false
+            let canEmitAuthSuccess = true
             console.log(this.examId)
             examFaceEnable(this.examId).then((res) => {
             // examFaceEnable(2709).then((res) => {
               console.log('examFaceEnable', res)
               if (res === 1) {
                 faceEnable = true
+                if (portrait === null) {
+                  uni.showModal({
+                    title: '提示',
+                    content: '请先在微信搜索公众号“武汉好学优课”采集人脸信息！',
+                    showCancel: false
+                  })
+                  canEmitAuthSuccess = false
+                }
               }
-              this.$emit('authLoginSuccess', faceEnable) 
+              if (canEmitAuthSuccess) {
+                this.$emit('authLoginSuccess', faceEnable) 
+              }
             })
           }
         })

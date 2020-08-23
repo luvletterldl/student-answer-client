@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import { header, uploadFaceCheckImageToAliOss, compareFaceSync, uploadFaceCheckServeCallback } from '../../lib/Api'
+import { header, findExamQuestionList, compareFaceSync, uploadFaceCheckServeCallback, uploadFaceCheckImageToAliOss } from '../../lib/Api'
 import { authCameraTips } from '../../lib/Utils'
 import Main from '../../lib/Main'
 export default {
@@ -87,16 +87,15 @@ export default {
     },
     usePhoto() {
       uni.showLoading()
-      uploadFaceCheckImageToAliOss(this.examRecordDataId, this.tempPath).then((path) => {
-        console.log('uploadImageToAliOss', path)
-        const url = `${Main.host}/api/k12/wx/getImage?filePath=${path}`
+      uploadFaceCheckImageToAliOss(this.examRecordDataId, this.examId, this.tempPath).then((path) => {
+        console.log('uploadImageToAliOss ssss', path, this.examRecordDataId, this.tempPath)
         this.tempPath = ''
-        compareFaceSync(url, this.userId, this.examId).then((resp) => {
+        compareFaceSync(path, this.userId, this.examId).then((resp) => {
           console.log('compareFaceSync', resp)
           if (resp.isPass) {
             getApp().globalData.authStatus = true
-            uploadFaceCheckServeCallback(resp)
-            this.$emit('initExam')
+            // uploadFaceCheckServeCallback(resp)
+            this.$emit('initExam', resp)
           } else {
             this.isRepeat = '重新'
           }

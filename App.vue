@@ -28,6 +28,9 @@ export default {
 	onShow: function() {
 		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, currentExamType, onHideLeaveTime } = this.$scope.globalData
 		console.log('App Show', isAnswering);
+		/**
+		 * 认证状态为true， 有Hide动作， 不是合法的Hide操作，当前考试类型是线上考试
+		 */
 		if (authStatus === true && hasHideAction === true && !legalHideAction && currentExamType === ExamType.K12_ONLINE_EXAM) {
 			if (!isAnswering) {
 				const returnTime = Math.floor(Date.now() / 1000)

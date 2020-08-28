@@ -164,9 +164,9 @@ export default {
 			assignmentInfo: {}, 
 			questionList: [], // 题目列表
 			currentTopicIndex: 0, // 当前题目索引
+			ChoiceOption,
 			QuestionType, // 题目类型
 			questionType: '', // 传进来的题目类型，如果isAnswering是true，过滤掉除此之外的其他类型的题目
-			ChoiceOption,
 			selectedOptions: [], // 选择题选中的索引列表
 			boolStudentAnswer: null, // 判断题
 			timeLimitList: [], // 限时列表
@@ -195,7 +195,7 @@ export default {
 			faceCheckStatus: false, // 人脸检测是否展示
 			faceSnapshot: false, // 是否开启抓拍
 			invokeBeforeExamCameraShow: 0, // 通过在BeforeExamCamera中监听此状态是否变化来展示camera组件
-			compareFaceResponse: undefined, // 对比人脸之后返回的数据
+			compareFaceResponse: null, // 对比人脸之后返回的数据
 		}
 	},
 	computed: {
@@ -247,7 +247,7 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=335e7b0301164d6ea9069ab6e4b63aeb&key=U_E_17_11939&userId=11939&studentId=11971&examId=2867&mainNum=1&className=0821线上测评2&courseName=undefined&currentLessonNumber=undefined&isAnswering=false&account=15911111116&source=OE&examType=K12_ONLINE_EXAM&restart=false'
+		// const url = 'https://test.xiaocongkj.com/?token=3acbe2cd59874ffda6a1204aaca8f39f&key=U_S_17_12601&userId=12601&studentId=12636&examId=2903&mainNum=1&className=教务班0827&courseName=教研课程0827&currentLessonNumber=第一课次&isAnswering=false&account=13312345611&source=OA&examType=Assignment'
 		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -322,7 +322,9 @@ export default {
 		this.clearIntervals()
   },
 	methods: {
-		// 考试初始化
+		/**
+		 * 考试初始化
+		 */
 		initExam(resp) {
 			this.faceCheckStatus = false
 			if (resp) {
@@ -343,13 +345,18 @@ export default {
 				this.examInProgressHandler()
 			}
 		},
+		/**
+		 * 更新比对人脸响应中需要的ExamRecordDataId
+		 */
 		updateCompareFaceResponseExamRecordDataId() {
-			if (this.compareFaceResponse !== undefined && this.examRecordDataId !== 0) {
+			if (this.compareFaceResponse !== null && this.examRecordDataId !== 0) {
 				this.compareFaceResponse.examRecordDataId = this.examRecordDataId
 				uploadFaceCheckServeCallback(this.compareFaceResponse)
 			}
 		},
-		// 锁终端操作，成功后继续考试
+		/**
+		 *  锁终端操作，成功后继续考试
+		 */
 		lockTerminalAction() {
 			this.updateCompareFaceResponseExamRecordDataId()
 			lockTerminalLock(this.userId, this.studentId, this.examId, this.examRecordDataId, this.examType, this.questionType).then((resp) => {
@@ -358,7 +365,9 @@ export default {
 				this.continueExam()
 			})
 		},
-		// 检测当前考试是否需要断点续考
+		/**
+		 * 检测当前考试是否需要断点续考
+		 */
 		examInProgressHandler() {
 			uni.showLoading()
 			checkExamInProgress().then((res) => {
@@ -399,7 +408,9 @@ export default {
 				}
 			}).catch(() => { uni.hideLoading() })
 		},
-		// 继续考试
+		/**
+		 * 继续考试
+		 */
 		continueExam() {
 			examHeartbeat(this.examId).then((resp) => {
 				console.log('examHeartbeat', resp)
@@ -419,7 +430,9 @@ export default {
 				}, 1000)
 			})
 		},
-		// 开始或者重做
+		/**
+		 * 开始或者重做
+		 */
     startOrRestartAction() {
 			uni.showLoading()
       if (this.restart === true) {
@@ -434,7 +447,9 @@ export default {
       	}).catch(() => { uni.hideLoading() })
       }
 		},
-		// 重做
+		/**
+		 * 重做
+		 */
 		restartAction(isEndExam) {
 			this.clearIntervals()
 			if (isEndExam) {
@@ -471,7 +486,9 @@ export default {
 				})
 			}
 		},
-		// 开始或者重做的回调
+		/**
+		 * 开始或者重做的回调
+		 */
 		startOrRestartExamCallback(res) {
 			console.log('startExam', res)
 			if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
@@ -500,7 +517,9 @@ export default {
 				})
 			}
 		},
-		// 更新考试题目列表数据
+		/**
+		 * 更新考试题目列表数据
+		 */
 		updateQuestionList(params) {
 			console.log('updateQuestionList params', params)
 			if (params) {
@@ -571,7 +590,9 @@ export default {
 				})
 			}
 		},
-		// 左右切换题目
+		/**
+		 * 左右切换题目
+		 */
 		switchTopic(dir) {
 			const { audioPlaying, audioRecording } = getApp().globalData
 			if (audioPlaying || audioRecording) {
@@ -583,20 +604,28 @@ export default {
 				this.currentTopicIndex = newIndex > this.questionList.length - 1 ? 0 : newIndex < 0 ? this.questionList.length - 1 : newIndex
 			}
 		},
-		// 展示或隐藏总览
+		/**
+		 * 展示或隐藏总览
+		 */
 		showOrHideTopicOverview() {
 			this.showTopicTab = !this.showTopicTab
 		},
-		// 选择某一题
+		/**
+		 * 选择某一题
+		 */
 		chooseQuestion(index) {
 			this.currentTopicIndex = index
 			this.showOrHideTopicOverview()
 		},
-		// 对富文本中的图片进行处理
+		/**
+		 * 对富文本中的图片进行处理
+		 */
 		fmtRichTextImg(nodes) {
 			return formatRichTextImg(nodes)
 		},
-		// 倒计时
+		/**
+		 * 倒计时
+		 */
 		fmtSecToMin(time) {
 			if (this.timeLimitList.length > 0 && time !== undefined) {
 				const fmtTime = formatSecondToHHmmss(time)
@@ -605,11 +634,15 @@ export default {
 				return '0:0'
 			}
 		},
-		// 子组件暂存成功重置状态
+		/**
+		 * 子组件暂存成功重置状态
+		 */
 		storedTopic() {
 			this.storeFlag = false
 		},
-		// 触发子组件暂存
+		/**
+		 * 触发子组件暂存
+		 */
     storeTopic() {
 			this.switchTopic(true)
 			uni.showToast({
@@ -617,7 +650,9 @@ export default {
 				icon: 'success'
 			})
 		},
-		// 点击上交
+		/**
+		 * 点击上交
+		 */
 		submitTopic() {
 			if (this.isAnswering) {
 				uni.showModal({ title: '提示', content: '请在原终端进行提交!', showCancel: false })
@@ -626,12 +661,16 @@ export default {
 			console.log('submitTopic', this.submitFlag)
 			this.submitFlag === -1 ? this.submitFlag = 0 : this.submitTopicAction()
 		},
-		// 子组件提交题目完成后调用改变submitFlag为1，触发watch中的结束考试操作
+		/**
+		 * 子组件提交题目完成后调用改变submitFlag为1，触发watch中的结束考试操作
+		 */
 		updateSubmitFlag(data) {
 			console.log('updateSubmitFlag', data, this.submitFlag)
 			this.submitFlag === 0 ? this.submitFlag = 1 : () => {}
 		},
-		// 结束考试
+		/**
+		 * 结束考试
+		 */
 		endExamAction(unShowExit) {
 			uni.showLoading({ title: '上交中...' })
 			return endExam(this.examId, this.userId).then((res) => {
@@ -651,10 +690,15 @@ export default {
 				console.log('endExam', res)
 			})
 		},
+		/**
+		 * 展示退出按钮
+		 */
 		showExitBtnAction(){
 			this.showExitBtn = true
 		},
-		// 上交前拦截判断
+		/**
+		 * 上交前拦截判断
+		 */
 		submitTopicAction() {
 			const that = this
 			uni.showModal({
@@ -680,7 +724,9 @@ export default {
         }
 			})
 		},
-		// 用户认证成功回调
+		/**
+		 * 用户认证成功回调
+		 */
 		authLoginSuccess(faceEnable) {
 			// 如果需要考试前认证先不初始化
 			this.needLogin = false
@@ -708,28 +754,38 @@ export default {
 				this.initExam()
 			}
 		},
-		// 清除定时器
+		/**
+		 * 清除定时器
+		 */
 		clearIntervals() {
 			clearInterval(this.timer)
 			clearInterval(this.countdownTimer)
 			clearInterval(this.snapshotTimer)
 		},
-		// 考试引导
+		/**
+		 * 考试引导
+		 */
 		startAnswerGuide() {
 			this.showAnswerGuide = true
 			this.answerGuideChangeStep(0)
 		},
-		// 引导步数
+		/**
+		 * 引导步数
+		 */
 		answerGuideChangeStep(index) {
 			this.answerGuideIndex = index
 		},
-		// 隐藏引导
+		/**
+		 * 隐藏引导
+		 */
 		hideAnswerGuide() {
 			this.answerGuideIndex = -1
 			this.showAnswerGuide = false
 			uni.setStorageSync('answerGuide', '1')
 		},
-		// 拍照上传之后评估（uploadExamCapture）
+		/**
+		 * 拍照上传之后评估（uploadExamCapture）
+		 */
 		takePhoto(needUpload = true) {
 			const takePhotoAction = () => {
 				return this.cameraCtx.takePhoto().then((res) => {
@@ -753,16 +809,24 @@ export default {
 			}
 			return takePhotoAction()
 		},
+		/**
+		 * camera组件初始化失败回调
+		 */
 		binderror(e) {
 			console.log('binderror', e)
 			this.cameraCtx = null
 			authCameraTips()
 		},
+		/**
+		 * camera组件初始化成功回调
+		 */
 		bindinitdone(e) {
 			this.cameraCtx = uni.createCameraContext()
 			console.log('bindinitdone', e)
 		},
-		// 相机移动事件处理
+		/**
+		 * 相机移动事件处理
+		 */
 		cameraTouchMove(e) {
 			const { clientX, clientY, pageX, pageY } = e.touches[0]
 			const x = Math.floor(clientX === 0 ? pageX : clientX)
@@ -772,7 +836,9 @@ export default {
 				this.cameraTop = y >= 0.8 * windowHeight ? '80vh' : y <= 0.2 * windowHeight ? '0vh' : Math.floor((y / windowHeight) * 100) + 'vh'
 			}
 		},
-		// 判断当前考试要不要开启抓拍
+		/**
+		 * 判断当前考试要不要开启抓拍
+		 */
 		judgeIsSnapshot() {
 			if (this.restart) {
 				return
@@ -787,7 +853,9 @@ export default {
 				})
 			}
 		},
-		// 抓拍操作
+		/**
+		 * 抓拍操作
+		 */
 		snapshotHandler(snapshotInterval) {
 			console.log('snapshotHandler', snapshotInterval)
 			if (snapshotInterval && snapshotInterval > 0) {

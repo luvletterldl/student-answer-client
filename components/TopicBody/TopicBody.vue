@@ -131,13 +131,12 @@ export default {
   },
   data() {
     return {
-      QuestionType: QuestionType,
-      ChoiceOption: ChoiceOption,
-      // userId: 0,
-      selectedOptions: [],
-      boolStudentAnswer: null,
-      oldBoolStudentAnswer: null,
-      rm: undefined,
+      QuestionType,
+      ChoiceOption,
+      selectedOptions: [], // 选择题选中的选项
+      boolStudentAnswer: null, // 判断题
+      oldBoolStudentAnswer: null, // 判断题之前的作答结果
+      rm: undefined, //recordManager
       recordImg: iconRecord,
       recordStatus: 0,
       spokenResult: undefined,
@@ -264,14 +263,10 @@ export default {
     this.rm.onError((e) => this.onError(e))
   },
   beforeUpdate() {
-    // console.log('beforeUpdate', this.question.questionType, this.subQuesIndex, this.isNestedAnswer)
     if (getApp().globalData.authStatus === false) {
       this.$emit('showExitBtnAction')
     }
   },
-  // updated() {
-  //   console.log('updated', this.question, this.question.questionType)
-  // },
   onHide() {
     console.log('onHide',)
     this.submitTopicWhenBoolOrChoice()
@@ -293,9 +288,6 @@ export default {
         return false
       }
     },
-    // combineUrl(url) {
-    //   return `https://test.xiaocongkj.com/api/k12/wx/getImage?filePath=${url}`
-    // },
     isNeedUpdateSubmitFlag() {
       if (this.submitFlag === 0) {
         this.$emit('updateSubmitFlag', this.subQuesIndex)
@@ -321,20 +313,26 @@ export default {
         }
       }
     },
+    /**
+     * 提交选择题
+     */
     submitChoiceAnswer(question) {
-			if (this.oldSelectedOpts.length > 0) {
-        console.log(this.selectedOptions, this.oldSelectedOpts)
-				currentServerTime().then(serverTime => {
+      console.log(this.selectedOptions, this.oldSelectedOpts)
+      const submitAction = () => {
+        currentServerTime().then(serverTime => {
           examSubmit(this.examId, this.userId, serverTime, [{
-						order: question.order,
-						studentAnswer: this.oldSelectedOpts.toString(),
-						time: this.storeFlag === true ? this.time : this.oldTime,
-					}]).then((res) => {
+            order: question.order,
+            studentAnswer: this.oldSelectedOpts.toString(),
+            time: this.storeFlag === true ? this.time : this.oldTime,
+          }]).then((res) => {
             this.afterStoreTopic(question.order, this.oldSelectedOpts.toString())
-            this.oldSelectedOpts = []
-					})
-				})
-			} else {
+            // this.oldSelectedOpts = [] // 修复因为多选题点击过快导致的最后一次生效的问题
+          })
+        })
+      }
+      if (question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION || question.questionType === QuestionType.SINGLE_ANSWER_QUESTION && this.oldSelectedOpts.length > 0) {
+        submitAction()
+      } else {
         this.afterStoreTopic(question.order, question.studentAnswer)
       }
     },

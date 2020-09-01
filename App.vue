@@ -24,6 +24,7 @@ export default {
 	}, 
 	onLaunch: function() {
 		console.log('App Launch');
+		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 	},
 	onShow: function() {
 		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, currentExamType, onHideLeaveTime } = this.$scope.globalData

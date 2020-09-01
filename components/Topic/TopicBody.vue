@@ -326,11 +326,11 @@ export default {
             time: this.storeFlag === true ? this.time : this.oldTime,
           }]).then((res) => {
             this.afterStoreTopic(question.order, this.oldSelectedOpts.toString())
-            // this.oldSelectedOpts = [] // 修复因为多选题点击过快导致的最后一次生效的问题
+            this.oldSelectedOpts = [] // 修复因为多选题点击过快导致的最后一次生效的问题
           })
         })
       }
-      if (question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION || question.questionType === QuestionType.SINGLE_ANSWER_QUESTION && this.oldSelectedOpts.length > 0) {
+      if ((question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION || question.questionType === QuestionType.SINGLE_ANSWER_QUESTION) && this.oldSelectedOpts.length > 0) {
         submitAction()
       } else {
         this.afterStoreTopic(question.order, question.studentAnswer)
@@ -363,7 +363,9 @@ export default {
 			} else if (question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION) {
 				const i = this.selectedOptions.findIndex((v) => v === index)
 				if (i !== -1) {
-          this.selectedOptions.splice(i, 1)
+          if (this.selectedOptions.length > 1) {
+            this.selectedOptions.splice(i, 1)
+          }
         } else {
           this.selectedOptions.push(index)
         }

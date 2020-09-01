@@ -7,27 +7,23 @@
 			:currentLessonNumber='currentLessonNumber'
 		/>
 		<view class="answer-panel">
-			<view class="topic-switch" :style="answerGuideIndex === 1 ? 'z-index: 101' : 'z-index: 2'">
-				<image @click='switchTopic(false)' src='../../static/images/icon_prevTopic.png' class='switcher' />
-				<view class='topicProcess'>
-					<view class='process'>
-						<text class="time-limit"><text class="cdtime">{{ currentTopicTimeCost }}</text>/{{ fmtSecToMin(currentTopic.timeLimit) }}</text>
-						<text class='currentIndex'>{{ questionList.length > 0 ? currentTopicIndex + 1 : 0 }}/{{ questionList.length }}</text>
-					</view>
-					<view @click="showOrHideTopicOverview" class='viewAll'>
-						<text v-if="duration !== null">剩余时间：{{ remineTime }}</text>
-						<text>{{ showTopicTab ? '点击收起总览' : '点击查看总览' }}</text>
-					</view>
-				</view>
-				<image @click='switchTopic(true)' src='../../static/images/icon_nextTopic.png' class='switcher' />
-			</view>
-			<view v-if="showTopicTab === true" class="topic-tab">
-				<view class='topic-index'>
-					<view @click='chooseQuestion(index)' v-for="(item, index) in questionList" :key="index" class="item">
-						<view>{{ index + 1 }}</view>
-					</view>
-				</view>
-			</view>
+			<topic-switch
+				:answerGuideIndex='answerGuideIndex'
+				@switchTopic='switchTopic'
+				@showOrHideTopicOverview='showOrHideTopicOverview'
+				:currentTopicTimeCost='currentTopicTimeCost'
+				:questionList='questionList'
+				:currentTopic='currentTopic'
+				:currentTopicIndex='currentTopicIndex'
+				:duration='duration'
+				:remineTime='remineTime'
+				:showTopicTab='showTopicTab'
+			/>
+			<topic-tab
+				v-if='showTopicTab === true'
+				:questionList='questionList'
+				@chooseQuestion='chooseQuestion'
+			/>
 			<view class="topic-list" :style="answerGuideIndex === 2 ? 'z-index: 101' : 'z-index: 0'">
 				<view v-if="currentTopic.hasSub === true" class="topic-body">
 					<view class="ques-top-body">
@@ -124,19 +120,23 @@
 import ClassTopBaseInfo from '../../components/ClassTopBaseInfo/ClassTopBaseInfo';
 import CustomAudio from '../../components/CustomAudio/CustomAudio';
 import RecorderPanel from '../../components/RecorderPanel/RecorderPanel'
-import TopicBody from '../../components/TopicBody/TopicBody'
+import TopicBody from '../../components/Topic/TopicBody'
+import TopicSwitch from '../../components/Topic/TopicSwitch'
+import TopicTab from '../../components/Topic/TopicTab'
 import AuthLogin from '../../components/AuthLogin/AuthLogin'
 import AnswerGuide from '../../components/CustomGuide/AnswerGuide'
 import DefaultAnswerPageView from '../../components/DefaultAnswerPageView/DefaultAnswerPageView'
 import BeforeExamCamera from '../../components/BeforeExamCamera/BeforeExamCamera'
 import { QuestionType, ChoiceOption, ExamType } from '../../lib/Enumerate';
-import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, formatRichTextImg, authCameraTips } from '../../lib/Utils';
+import { parseParamsFromUrl, formatQuestionType, formatSecondToHHmmss, fmtSecToMin, formatRichTextImg, authCameraTips } from '../../lib/Utils';
 import Main from '../../lib/Main';
 import { findClsAndCourseByClassIdAndCourseId, pageAssignment, startExam, getQuestions, findExamQuestionList, examSubmit, currentServerTime, endExam, examHeartbeat, header, restartExam, checkExamInProgress, uploadImageToAliOss, lockTerminalLock, uploadFaceToAliOss, isFaceCheck, examFaceEnable, examFaceCheck, uploadExamCapture, examSnapshotInterval, uploadFaceCheckServeCallback } from '../../lib/Api'
 const { windowWidth, windowHeight } = uni.getSystemInfoSync()
 export default {
 	components: {
 		ClassTopBaseInfo,
+		TopicSwitch,
+		TopicTab,
 		CustomAudio,
 		RecorderPanel,
 		TopicBody,
@@ -215,7 +215,9 @@ export default {
 		},
 		// 当前题目耗时
 		currentTopicTimeCost() {
-			return this.fmtSecToMin(this.timeLimitList[this.currentTopicIndex])
+			if (this.timeLimitList.length > 0) {
+				return fmtSecToMin(this.timeLimitList[this.currentTopicIndex])
+			}
 		}
 	},
 	watch: {
@@ -243,12 +245,10 @@ export default {
 		}
 	},
 	onLoad(options) {
-		// this.beforeExamFaceCheck = true
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
-		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=3acbe2cd59874ffda6a1204aaca8f39f&key=U_S_17_12601&userId=12601&studentId=12636&examId=2903&mainNum=1&className=教务班0827&courseName=教研课程0827&currentLessonNumber=第一课次&isAnswering=false&account=13312345611&source=OA&examType=Assignment'
-		const url = decodeURIComponent(options.q)
+		const url = 'https://test.xiaocongkj.com/?token=72a40c61a8934fa0bb12a57410004728&key=U_E_17_11926&userId=11926&studentId=11957&examId=2767&examRecordDataId=3768&mainNum=11&className=0807一班（网考）&courseName=教研0807&currentLessonNumber=网考&isAnswering=true&source=OE&examType=Exercise&questionType=SPOKEN_ANSWER_QUESTION&restart=true'
+		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
@@ -624,17 +624,6 @@ export default {
 			return formatRichTextImg(nodes)
 		},
 		/**
-		 * 倒计时
-		 */
-		fmtSecToMin(time) {
-			if (this.timeLimitList.length > 0 && time !== undefined) {
-				const fmtTime = formatSecondToHHmmss(time)
-				return `${fmtTime.min}:${fmtTime.second}`
-			} else {
-				return '0:0'
-			}
-		},
-		/**
 		 * 子组件暂存成功重置状态
 		 */
 		storedTopic() {
@@ -875,106 +864,6 @@ export default {
 
 <style lang="scss" scoped>
 .answer-panel {
-  .topic-switch {
-    display: flex;
-    flex-flow: row;
-    width: 90vw;
-    background: #FFF;
-    border-radius: 3vw;
-    margin: 2vw 5vw;
-    padding: 3vw 5vw;
-    align-items: center;
-		justify-content: space-between;
-		position: sticky;
-		top: 0;
-		z-index: 2;
-		box-shadow: 0px 0px 10px 0px #dce4f6;
-    .switcher {
-      width: 8vw;
-			height: 8vw;
-			flex-shrink: 0;
-    }
-    .topicProcess {
-      font-size: 4vw;
-      color: #9098B4;
-      display: flex;
-      justify-content: space-around;
-      flex-flow: column;
-      align-items: center;
-      .currentIndex {
-        color: #36415C;
-			}
-			.process, .viewAll {
-				width: 100%;
-				display: flex;
-				flex-flow: row nowrap;
-				justify-content: space-evenly;
-				align-items: center;
-				width: 65vw;
-				.cdtime {
-					color: #FF5D66;
-					&::before {
-						content: '';
-						position: absolute;
-						width: 4vw;
-						height: 4vw;
-						background: url('../../static/images/icon_timeLimit.png') no-repeat;
-						background-size: 100% 100%;
-						margin: .8vw 5vw 0 -5vw;
-					}
-				}
-			}
-    }
-  }
-	.topic-tab {
-		background: #FFF;
-		box-shadow: 0px 0px 10px 0px rgba(220,228,246,1);
-		font-family:Arial-BoldMT,Arial;
-		font-weight: normal;
-		width: 90vw;
-		margin: 3vw 5vw;
-		padding: 2vw;
-		border-radius: 3vw;
-		display: flex;
-		flex-flow: column;
-		text-align: center;
-		position: sticky;
-		top: 17vw;
-		z-index: 2;
-		.topic-index {
-			display: flex;
-			flex-wrap: wrap;
-			color: #666D88;
-			.item, .correct, .error {
-				width: 10vw;
-				height: 10vw;
-				border-radius: 50%;
-				display: flex;
-				justify-content: center;
-				align-items: center;
-				border: 1px solid #F3F6FC;
-				font-size: normal;
-				margin: 2vw;
-			}
-			.correct {
-				color: #13C6B2;
-				border: 1px solid #13C6B2;
-			}
-			.error {
-				color: #FF5D66;
-				border: 1px solid #FF5D66;
-			}
-			.selected {
-				color: #4184FF;
-				background: rgba(112,166,255,0.2);
-				border: 1px solid #70A6FF;
-			}
-		}
-		.extra-options {
-			color: #666D88;
-			padding: 9px 0;
-		}
-	}
 	.topic-list {
 		position: relative;
 		z-index: 0;

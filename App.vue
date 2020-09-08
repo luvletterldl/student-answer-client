@@ -24,9 +24,12 @@ export default {
 	}, 
 	onLaunch: function() {
 		console.log('App Launch');
+    // #ifdef MP-WEIXIN
 		uni.setKeepScreenOn({ keepScreenOn: true }) // 保持屏幕常亮
+    // #endif
 	},
 	onShow: function() {
+    // #ifdef MP-WEIXIN
 		const { authStatus, examRecordDataId, hasHideAction, legalHideAction, isAnswering, currentExamType, onHideLeaveTime } = this.$scope.globalData
 		console.log('App Show', isAnswering);
 		/**
@@ -50,6 +53,7 @@ export default {
 			}
 		}
 		this.$scope.globalData.legalHideAction = false
+    // #endif
 	},
 	onHide: function() {
 		console.log('App Hide');

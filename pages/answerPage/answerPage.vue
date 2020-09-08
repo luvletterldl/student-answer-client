@@ -86,6 +86,7 @@
 			:examId='examId'
 			:needLogin='needLogin'
 			v-on:authLoginSuccess='authLoginSuccess'
+			v-on:authLoginSuccessUpdateId='authLoginSuccessUpdateId'
 		/>
 		<answer-guide
 			:showAnswerGuide='showAnswerGuide'
@@ -202,7 +203,7 @@ export default {
 		// 当前题目
 		currentTopic() {
 			if (this.questionList === null || this.questionList.length === 0 || this.questionList === undefined || this.questionList[this.currentTopicIndex] === undefined) {
-				return ''
+				return {}
 			} else {
 				// 改变全局变量中的当前题目类型
 				getApp().globalData.currentQuestionType = this.questionList.length > 0 ? this.questionList[this.currentTopicIndex].questionType : ''
@@ -247,7 +248,7 @@ export default {
 	onLoad(options) {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=72a40c61a8934fa0bb12a57410004728&key=U_E_17_11926&userId=11926&studentId=11957&examId=2767&examRecordDataId=3768&mainNum=11&className=0807一班（网考）&courseName=教研0807&currentLessonNumber=网考&isAnswering=true&source=OE&examType=Exercise&questionType=SPOKEN_ANSWER_QUESTION&restart=true'
+		const url = 'https://test.xiaocongkj.com/?token=40fb8b6d456545a3a4e6a7ae4fcd596d&key=U_E_17_11930&userId=11930&studentId=11961&examId=2869&examRecordDataId=3848&mainNum=5&className=1213一班&courseName=1213教研一&currentLessonNumber=第2课次&isAnswering=true&source=OE&examType=Assignment&questionType=FILL_BLANK_QUESTION&restart=true'
 		// const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
@@ -261,8 +262,8 @@ export default {
 			// 'currentLessonNumber' in p &&
 			'examId' in p &&
 			// 'examRecordDataId' in p &&
-			'studentId' in p &&
-			'userId' in p &&
+			// 'studentId' in p &&
+			// 'userId' in p &&
 			'isAnswering' in p &&
 			'source' in p
 		) {
@@ -276,8 +277,8 @@ export default {
 			this.currentLessonNumber = currentLessonNumber
 			this.examId = Number(examId)
 			this.examRecordDataId = 'examRecordDataId' in p ? Number(p.examRecordDataId) : 0
-			this.studentId = Number(studentId)
-			this.userId = Number(userId)
+			this.studentId = 'studentId' in p ? Number(studentId) : 0
+			this.userId = 'userId' in p ? Number(userId) : 0
 			this.isAnswering = isAnswering === 'true' ? true : isAnswering === 'false' ? false : null
 			this.source = source
 			this.examType = 'examType' in p ? p.examType : ''
@@ -712,6 +713,14 @@ export default {
           }
         }
 			})
+		},
+		/**
+		 * 登录成功后刷新studentId和userId
+		 */
+		authLoginSuccessUpdateId(studentId, userId) {
+			Main.userId = userId
+			this.studentId = studentId
+			this.userId = userId
 		},
 		/**
 		 * 用户认证成功回调

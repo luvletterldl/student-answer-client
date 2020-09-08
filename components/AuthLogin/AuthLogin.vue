@@ -51,10 +51,12 @@ export default {
           } else {
             // 如果是OE还是用二维码中的token
             uni.hideLoading()
-            const { key, token } = res.user
+            const { key, token, userId } = res.user
+            const { id } = res.student
             const portrait = res.student.portrait
             header.key = key
             header.token = token
+            this.$emit('authLoginSuccessUpdateId', id, userId)
             getApp().globalData.authStatus = true
             let faceEnable = false
             let canEmitAuthSuccess = true

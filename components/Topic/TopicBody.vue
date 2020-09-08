@@ -674,14 +674,6 @@ export default {
       align-items: center;
       justify-content: flex-start;
       width: 100%;
-      // .record {
-      //   border-radius: 100%;
-      //   border: #c0c0c0 solid 1px;
-      //   width: 10vw;
-      //   height: 10vw;
-      //   flex-shrink: 0;
-      //   margin-right: 3vw;
-      // }
       .record-desc {
         width: 45%;
       }
@@ -714,7 +706,6 @@ export default {
           width: 10vw;
           height: 10vw;
           flex-shrink: 0;
-          // margin-right: 3vw;
         }
         .evaluationAccuracy {
           border-radius: 100%;

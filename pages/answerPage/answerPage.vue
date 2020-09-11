@@ -29,7 +29,12 @@
 					<view class="ques-top-body">
 						<text class="ques-type">{{ fmtQuestionType }}</text>
 						<text class="quest-index">{{ currentTopicIndex + 1 }}、</text>
+						<!--  #ifndef H5 -->
 						<rich-text class="questBody" :nodes="fmtRichTextImg(currentTopic.quesBody)" />
+            <!--  #endif -->
+            <!--  #ifdef H5 -->
+            <view class="questBody" v-html="fmtRichTextImg(currentTopic.quesBody)" />
+            <!--  #endif -->
 						<custom-audio v-if="currentTopic.audioLink !== null && currentTopic.audioLink !== ''" :audioSrc="currentTopic.audioLink" />
 						<topic-body
 							v-for="(ques, index) in currentTopic.subQuestions"
@@ -181,7 +186,7 @@ export default {
 			submitFlag: -1, // 提交标识 默认状态：-1；上交作业中： 0；上交完毕： 1
 			isAnswering: null, // true: 表明已经在其他终端开始作答，本终端不能上交； false: 在本终端开启作答，可以在本终端上交
 			restart: null, // 是否是重刷
-			account: null, // 用户的账户
+			account: '', // 用户的账户
 			needLogin: false, // 是否需要先进行用户认证
 			showAnswerGuide: false, // 是否显示答题引导,
 			answerGuideIndex: -1, // 当前引导的步骤
@@ -248,8 +253,8 @@ export default {
 	onLoad(options) {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		// 调试时打开这句注释下句
-		const url = 'https://test.xiaocongkj.com/?token=40fb8b6d456545a3a4e6a7ae4fcd596d&key=U_E_17_11930&userId=11930&studentId=11961&examId=2869&examRecordDataId=3848&mainNum=5&className=1213一班&courseName=1213教研一&currentLessonNumber=第2课次&isAnswering=true&source=OE&examType=Assignment&questionType=FILL_BLANK_QUESTION&restart=true'
-		// const url = decodeURIComponent(options.q)
+		// const url = 'https://test.xiaocongkj.com/?token=84eb02ef3f4645269384c0b75d0202a8&key=U_E_17_11926&userId=11926&studentId=11957&examId=2869&mainNum=1&className=0821一班&courseName=0821教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Assignment&restart=true'
+		const url = decodeURIComponent(options.q)
 		const q = decodeURIComponent(url)
 		console.log('options', q)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
@@ -296,7 +301,7 @@ export default {
 			if (this.isAnswering) {
 				this.judgeIsSnapshot()
 			}
-			if (this.account === null) {
+			if (this.account === '') {
 				if (!this.isAnswering && 'account' in p) {
 					this.account = p.account
 					this.needLogin = true

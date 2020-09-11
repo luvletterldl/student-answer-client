@@ -1,12 +1,9 @@
 <template>
   <view class="topBaseInfo" :style="answerGuideIndex === 0 ? 'z-index: 101' : 'z-index: 0'">
     <view class='lessonName'>
-      <!-- <text class="lessonNumber">{{ currentLessonNumber }}</text>
-      <text class="courseName">{{ courseName }}</text> -->
       <view class='clsName'>{{ className }}</view>
       <img @click="showOrHideCCName" class="showOrHide" :class="showCCName ? '' : 'hideStatus'" src="../../static/images/icon_answerSOH.png" />
     </view>
-    <!-- <view v-show="showCCName" class='clsName'>{{ className }}</view> -->
     <view v-show="showCCName" class='lessonNumber'>{{ currentLessonNumber === 'undefined' ? '' : currentLessonNumber }}</view>
     <view v-show="showCCName" class='courseName'>{{ courseName === 'undefined' ? '' : courseName }}</view>
   </view>

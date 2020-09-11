@@ -6,7 +6,17 @@
     {
       "path" : "pages/answerPage/answerPage",
       "style" : {
-        "navigationBarTitleText": "答题"
+        //#ifdef H5
+        "titlePenetrate": "YES",
+        //#endif
+        "mp-weixin": {
+          "navigationBarTitleText": "答题"
+        },
+        "h5": {
+          "titleNView": {
+            "type": "transparent"
+          }
+        }
       }
     },
     {

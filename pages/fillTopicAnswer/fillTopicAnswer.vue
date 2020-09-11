@@ -17,7 +17,8 @@
 
 <script>
 import Main from '../../lib/Main'
-import { uploadImageToAliOss, currentServerTime, examSubmit, findExamQuestionList } from '../../lib/Api.js'
+import { dataURItoBlob, resetContentType } from '../../lib/Utils'
+import { uploadImageToAliOss, currentServerTime, examSubmit, findExamQuestionList, header } from '../../lib/Api.js'
 const windowWidth = uni.getSystemInfoSync().windowWidth
 const imgPreUrl = `${Main.host}api/k12/wx/getImage?filePath=`
 export default {
@@ -100,18 +101,32 @@ export default {
         canvasId: 'canId',
       }).then((res) => {
         console.log('first', res[1].tempFilePath)
+        //#ifndef H5
         const tempFilePath = res[1].tempFilePath
-        this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, 400)
+				this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, 400)
+        //#endif
+				//#ifdef H5
+        const blob = dataURItoBlob(res[1].tempFilePath)
+        const canvas = document.createElement('canvas');
+        const dataURL = canvas.toDataURL('image/jpeg', 0.5);
+        const tempFilePath = new FormData(document.forms[0]);
+        tempFilePath.append("image", blob, 'image.png');
+        //#endif
         uploadImageToAliOss(this.examId, tempFilePath).then((res) => {
 					console.log('uploadImageToAliOss', res)
-					// const questionLength = 
 					const urls = this.urls
+          //#ifndef H5
 					urls[this.index] = res
+          //#endif
+          //#ifdef H5
+          urls[this.index] = res.data
+          //#endif
 					urls.forEach((v, i) => {
 						if (i !== 0) {
 							urls[i] = `##${v}`
 						}
 					})
+          resetContentType()
 					currentServerTime().then(serverTime => {
 						examSubmit(this.examId, this.userId, serverTime, [{
 							order: this.order,

@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^0.20.0",
+    "recorder-core": "^1.1.20062600",
     "uview-ui": "^1.5.0"
   },
   "devDependencies": {}

@@ -3,13 +3,23 @@
     <view class="ques-top-body">
       <text class="ques-type">{{ fmtQuestionType }}</text>
       <text class="quest-index">{{ questionIndex + 1 }}、</text>
+      <!--  #ifndef H5 -->
       <rich-text class="questBody" :nodes="fmtRichTextImg(question.quesBody)" />
+      <!--  #endif -->
+      <!--  #ifdef H5 -->
+      <view class="questBody" v-html="fmtRichTextImg(question.quesBody)" />
+      <!--  #endif -->
       <custom-audio v-if="question.audioLink !== null && question.audioLink !== ''" :audioSrc="question.audioLink" />
     </view>
     <view v-if="question.questionType === QuestionType.SINGLE_ANSWER_QUESTION || question.questionType === QuestionType.MULTIPLE_ANSWER_QUESTION" class="options">
       <view @click="chooseSelectItem(question, index)" v-for="(option, index) in question.quesOptions" :key="index" class="option">
         <view class="option-index" :class="selectedOptions.includes(index) ? 'selected-option' : ''">{{ ChoiceOption[index] }}</view>
-        <rich-text :nodes="fmtRichTextImg(option.optionBody)" />
+        <!--  #ifndef H5 -->
+        <rich-text :nodes="fmtRichTextImg(option.quesBody)" />
+        <!--  #endif -->
+        <!--  #ifdef H5 -->
+        <view v-html="fmtRichTextImg(option.quesBody)" />
+        <!--  #endif -->
       </view>
     </view>
     <view v-if="question.questionType === QuestionType.BOOL_ANSWER_QUESTION" class="true-false">
@@ -37,15 +47,22 @@
         <view class="record-desc">{{ recordDesc }}</view>
         <view class="audio-text">
           <custom-audio
-            class="custom-audio"
+            class='recorder-audio'
+            v-if="question.studentAnswer !== '' && question.studentAnswer !== null"
             :audioSrc='question.studentAnswer'
             :showTime="false"
+            ref='audio'
           />
           <image @click="recordAction" :src="recordImg" class="record"/>
           <text v-if="showSpokenAnswer === 1" class="evaluationAccuracy">{{ evaluationAccuracy }}</text>
         </view>
         <view v-if="showSpokenAnswer === 1" class="evoluation">
+          <!--  #ifndef H5 -->
           <rich-text class="words" :nodes="fmtRichTextImg(evaluationResult)" />
+          <!--  #endif -->
+          <!--  #ifdef H5 -->
+          <view class="words" v-html="fmtRichTextImg(evaluationResult)" />
+          <!--  #endif -->
         </view>
       </view>
     </view>
@@ -55,11 +72,14 @@
 <script>
 import { QuestionType, ChoiceOption } from '../../lib/Enumerate'
 import CustomAudio from '../CustomAudio/CustomAudio'
-import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam, findExamQuestionList } from '../../lib/Api'
-import { formatQuestionType, formatRichTextImg, beforeAudioRecordOrPlay, afterAudioRecord } from '../../lib/Utils';
+import { uploadMp3ToAliOss, getSpokenAnswerResult, examSubmit, currentServerTime, uploadImageToAliOss, endExam, findExamQuestionList, header } from '../../lib/Api'
+import { formatQuestionType, formatRichTextImg, beforeAudioRecordOrPlay, afterAudioRecord, resetContentType } from '../../lib/Utils';
 import iconRecord from '../../static/images/icon_record.png'
 import iconRecording from '../../static/images/icon_recording.png'
 import Main from '../../lib/Main'
+//#ifdef H5
+import Recorder from 'recorder-core/recorder.mp3.min'
+//#endif
 export default {
   name: 'TopicBody',
   props: {
@@ -244,13 +264,14 @@ export default {
         const body = result.wordsEvaluation.reduce((total, v) => {
           return `${total}<span style="color: ${v.pronAccuracy < 30 ? 'red' : v.pronAccuracy >= 60 ? 'green' : 'orange'};">${v.word} &ensp;</span>`
         }, '')
-        return `<div style="display: flex; flex-flow: row wrap;>${body}</div>`
+        return `<div style="display: flex; flex-flow: row wrap;">${body}</div>`
       } else {
         return ''
       }
     }
   },
   mounted() {
+    //#ifndef H5
     if (this.rm === undefined) {
       this.rm = uni.getRecorderManager()
     }
@@ -261,6 +282,10 @@ export default {
     this.rm.onInterruptionBegin((e) => this.onInterruptionBegin(e))
     this.rm.onInterruptionEnd((e) => this.onInterruptionEnd(e))
     this.rm.onError((e) => this.onError(e))
+    //#endif
+    //#ifdef H5
+    this.recOpen()
+    //#endif
   },
   beforeUpdate() {
     if (getApp().globalData.authStatus === false) {
@@ -437,22 +462,36 @@ export default {
           uni.showLoading({
             title: '上传中...',
           })
-					const filePath = res[1].tempFilePaths[0]
-          console.log(res, this.examId, filePath)
+          console.log('uploadTextAnswer', res, this.examId, filePath)
+          //#ifndef H5
+          const filePath = res[1].tempFilePaths[0]
+          //#endif
+          //#ifdef H5
+          const filePath = new FormData()
+          filePath.append("image", res[1].tempFiles[0], "image.png")
+          //#endif
+          console.log('uploadTextAnswer', res, this.examId, filePath)
           // 此操作完成后重置为false
           getApp().globalData.legalHideAction = false
           uploadImageToAliOss(this.examId, filePath).then((resp) => {
+            //#ifdef H5
+            resetContentType()
+            const respData = resp.data
+            //#endif
+            //#ifndef H5
+            const respData = resp
+            //#endif
             uni.hideLoading()
             uni.showLoading({ title: '提交中...' })
-						console.log('uploadImageToAliOss', resp, question)
+						console.log('uploadImageToAliOss', respData, question)
 						currentServerTime().then(serverTime => {
 							examSubmit(this.examId, this.userId, serverTime, [{ // 这里学生id要用userId ...
 								order: question.order,
-								studentAnswer: resp,
+								studentAnswer: respData,
 								time: this.time,
 							}]).then((res) => {
                 uni.hideLoading()
-								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, studentAnswer: resp}) )
+								this.$emit('updateQuestionList', JSON.stringify({ order: question.order, studentAnswer: respData}) )
 							}).catch((err) => {
                 uni.hideLoading()
               })
@@ -469,41 +508,45 @@ export default {
     recordAction() {
       if (this.recordStatus === 0 || this.recordStatus === 2) {
         if (beforeAudioRecordOrPlay('record')) {
+          //#ifndef H5
           this.rm.start({
             duration: 600000,
             format: 'mp3',
             sampleRate: 22050,
           })
-          this.recordStatus = 1
           this.rm.onStop((e) => this.onStop(e))
+          //#endif
+          //#ifdef H5
+          this.recStart()
+          //#endif
+          this.recordStatus = 1
         }
       } else if (this.recordStatus === 1) {
+        //#ifndef H5
         this.rm.stop()
+        //#endif
+        //#ifdef H5
+        this.recStop()
+        //#endif
         this.recordStatus = 2
         afterAudioRecord()
       }
     },
-    onStart(e) {
-      console.log('开始录音', this.question, this.subQuesIndex)
-      console.log(e)
-    },
-    onPause(e) {
-      console.log(e)
-      afterAudioRecord()
-    },
-    onResume(e) {
-      console.log(e)
-    },
-    onStop(e) {
-      console.log(e)
-      afterAudioRecord()
-      uni.showLoading({
-        title: '录音上传中...'
-      })
-      console.log('录音上传中', this.question, this.subQuesIndex)
-      console.log('上传录音参数', this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath)
-      uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
+    uploadMp3ToAliAction(e) {
+      //#ifdef H5
+      const audio = e
+      //#endif
+      //#ifndef H5
+      const audio = e.tempFilePath
+      //#endif
+      uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, audio).then((res) => {
+        //#ifdef H5
+        const data = res.data
+        resetContentType()
+        //#endif
+        //#ifndef H5
         const data = JSON.parse(res)
+        //#endif
         console.log('uploadMp3ToAliOss', data)
         if (data.code !== undefined && data.code !== '0') {
           uni.hideLoading()
@@ -541,6 +584,9 @@ export default {
                   audioText: this.question.audioText,
                   studentAnswer: answerNormalLink
                 }]).then((res) => {
+                  //#ifdef H5
+                  this.$refs.audio.audioSrc = answerNormalLink
+                  //#endif
                   this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
                 })
               })
@@ -553,6 +599,122 @@ export default {
       }).catch((err) => {
         throw new Error(err)
       })
+    },
+    recOpen(success) {
+      this.rec = Recorder({
+        type: 'mp3',
+        sampleRate: 22050,
+        onProcess: (buffers,powerLevel,bufferDuration,bufferSampleRate,newBufferIdx,asyncEnd) => {
+          // console.log(buffers,powerLevel,bufferDuration,bufferSampleRate,newBufferIdx,asyncEnd)
+        }
+      })
+      //var dialog=createDelayDialog(); 我们可以选择性的弹一个对话框：为了防止移动端浏览器存在第三种情况：用户忽略，并且（或者国产系统UC系）浏览器没有任何回调，此处demo省略了弹窗的代码
+      this.rec.open(() => {//打开麦克风授权获得相关资源
+          //dialog&&dialog.Cancel(); 如果开启了弹框，此处需要取消
+          //rec.start() 此处可以立即开始录音，但不建议这样编写，因为open是一个延迟漫长的操作，通过两次用户操作来分别调用open和start是推荐的最佳流程
+          success&&success();
+      }, (msg,isUserNotAllow) => {//用户拒绝未授权或不支持
+          //dialog&&dialog.Cancel(); 如果开启了弹框，此处需要取消
+          console.log((isUserNotAllow?"UserNotAllow，":"")+"无法录音:"+msg);
+      });
+    },
+    recStart() {
+      this.rec.start()
+    },
+    recStop() {
+      this.rec.stop((blob,duration) => {
+        console.log(blob,(window.URL||webkitURL).createObjectURL(blob),"时长:"+duration+"ms");
+        // this.rec.close();//释放录音资源，当然可以不释放，后面可以连续调用start；但不释放时系统或浏览器会一直提示在录音，最佳操作是录完就close掉
+        // this.rec=null;
+        //已经拿到blob文件对象想干嘛就干嘛：立即播放、上传
+        
+        /*** 【立即播放例子】 ***/
+        // var audio=document.createElement("audio");
+        // audio.controls=true;
+        // document.body.appendChild(audio);
+        // // //简单利用URL生成播放地址，注意不用了时需要revokeObjectURL，否则霸占内存
+        // audio.src=(window.URL||webkitURL).createObjectURL(blob);
+        // audio.play();
+        const form=new FormData();
+        form.append("audio",blob,"audio.mp3");
+        this.uploadMp3ToAliAction(form);
+      }, (msg) => {
+        console.log("录音失败:"+msg);
+        this.rec.close();//可以通过stop方法的第3个参数来自动调用close
+        this.rec=null;
+      });
+    },
+    onStart(e) {
+      console.log('开始录音', this.question, this.subQuesIndex)
+      console.log(e)
+    },
+    onPause(e) {
+      console.log(e)
+      afterAudioRecord()
+    },
+    onResume(e) {
+      console.log(e)
+    },
+    onStop(e) {
+      console.log(e)
+      afterAudioRecord()
+      uni.showLoading({
+        title: '录音上传中...'
+      })
+      console.log('录音上传中', this.question, this.subQuesIndex)
+      console.log('上传录音参数', this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath)
+      this.uploadMp3ToAliAction(e)
+      // uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
+      //   const data = JSON.parse(res)
+      //   console.log('uploadMp3ToAliOss', data)
+      //   if (data.code !== undefined && data.code !== '0') {
+      //     uni.hideLoading()
+      //     uni.showModal({
+      //       title: '提示',
+      //       content: data.code === '403' ? '登录状态失效，请在其他终端操作' : data.desc,
+      //       showCancel: false,
+      //     })
+      //     if (data.code === '403') {
+      //       getApp().globalData.authStatus = false
+      //     }
+      //     return false
+      //   } else {
+      //     uni.hideLoading()
+      //     uni.showLoading({
+      //       title: '评测中...'
+      //     })
+      //     const answerNormalLink = data.data.answerNormalLink
+      //     console.log('uploadMp3ToAliOss', data)
+      //     const getResult = () => getSpokenAnswerResult(data.data.id).then((resp) => {
+      //       console.log('getSpokenAnswerResult', resp)
+      //       const status = resp.data.status
+      //       if (status === 'Evaluating') {
+      //         setTimeout(() => {
+      //           getResult()
+      //         }, 3000)
+      //       } else if (status === 'Finished') {
+      //         this.spokenResult = resp.data.evaluation
+      //         uni.hideLoading()
+      //         currentServerTime().then((serverTime) => {
+      //           examSubmit(this.examId, this.userId, serverTime, [{
+      //             order: this.question.order,
+      //             time: this.time,
+      //             mediaId: data.data.id,
+      //             audioText: this.question.audioText,
+      //             studentAnswer: answerNormalLink
+      //           }]).then((res) => {
+      //             this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
+      //           })
+      //         })
+      //       }
+      //     }).catch((err) => {
+      //       throw new Error(err)
+      //     })
+      //     getResult();
+      //   }
+      // }).catch((err) => {
+      //   throw new Error(err)
+      // })
     },
     onInterruptionBegin(e) {
       console.log(e)
@@ -716,6 +878,13 @@ export default {
           display: flex;
           align-items: center;
           justify-content: center;
+        }
+        ::v-deep .recorder-audio {
+          max-width: 30vw;
+          overflow: hidden;
+          .uni-audio-right {
+            width: 16vw;
+          }
         }
       }
     }

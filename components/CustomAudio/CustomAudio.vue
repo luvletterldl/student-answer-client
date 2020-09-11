@@ -1,8 +1,15 @@
 <template>
-  <view class="custom-audio">
-    <image v-if="audioSrc !== ''" @click="playOrStopAudio" :src="audioImg" class="audio-btn" />
-    <text v-else @click="tips" class="audio-btn">无音源</text>
-    <text v-if="showTime">{{ fmtSecond(currentTime) }}/{{ fmtSecond(duration) }}</text>
+  <view>
+    <!-- #ifndef H5 -->
+    <view class="custom-audio">
+      <image v-if="audioSrc !== undefined && audioSrc !== null && audioSrc !== ''" @click="playOrStopAudio" :src="audioImg" class="audio-btn" />
+      <text v-else @click="tips" class="audio-btn">无音源</text>
+      <text v-if="showTime">{{ fmtSecond(currentTime) }}/{{ fmtSecond(duration) }}</text>
+    </view>
+    <!--  #endif -->
+    <!-- #ifdef H5 -->
+    <audio v-if="audioSrc !== undefined && audioSrc !== null && audioSrc !== ''" :src='audioSrc' controls />
+    <!--  #endif -->
   </view>
 </template>
 
@@ -55,11 +62,13 @@ export default {
     }
   },
   mounted() {
+    //#ifndef H5
     this.audioCtx = uni.createInnerAudioContext()
     this.audioCtx.src = this.audioSrc
     this.audioCtx.startTime = 0
     this.bindAuidoCallback(this.audioCtx)
     // console.log('onLoad', this.audioCtx, this.audioSrc)
+    //#endif
   },
   methods: {
     bindAuidoCallback(ctx) {

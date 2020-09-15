@@ -50,9 +50,20 @@
             "minified" : true
         }
     },
-    "h5": {
-        "devServer": {
-            "disableHostCheck": true
-        }
+    "h5" : {
+        "devServer" : {
+            "disableHostCheck" : true
+        },
+        "router" : {
+            "mode" : "hash",
+            "base" : ""
+        },
+        "optimization" : {
+            "treeShaking" : {
+                "enable" : false
+            }
+        },
+        "title" : "优学答答题",
+        "domain" : "http://192.168.0.32:5000"
     }
 }

@@ -254,9 +254,14 @@ export default {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		// 调试时打开这句注释下句
 		// const url = 'https://test.xiaocongkj.com/?token=84eb02ef3f4645269384c0b75d0202a8&key=U_E_17_11926&userId=11926&studentId=11957&examId=2869&mainNum=1&className=0821一班&courseName=0821教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Assignment&restart=true'
+		// #ifndef H5
 		const url = decodeURIComponent(options.q)
+		// #endif
+		// #ifdef H5
+		const url = decodeURIComponent(location.href)
+		// #endif
 		const q = decodeURIComponent(url)
-		console.log('options', q)
+		console.log('options', q, options)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
 		if (
 			'token' in p &&

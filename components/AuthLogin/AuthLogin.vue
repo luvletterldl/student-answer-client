@@ -2,7 +2,12 @@
   <view v-if="needLogin" class="auth-login">
     <view class="login-content">
       <text class="title">欢迎登录</text>
+      <!--  #ifdef H5 -->
+      <input class='text' placeholder="请输入账号" v-model.trim="account" type="text" />
+      <!--  #endif -->
+      <!--  #ifndef H5 -->
       <input class='text' disabled :placeholder="account" v-model.trim="account" type="text" />
+      <!--  #endif -->
       <input class='password' placeholder="请输入密码" v-model.trim="password" type="password" />
       <button class="submit" @click="submit">登录</button>
     </view>

@@ -51,7 +51,6 @@
             v-if="question.studentAnswer !== '' && question.studentAnswer !== null"
             :audioSrc='question.studentAnswer'
             :showTime="false"
-            ref='audio'
           />
           <image @click="recordAction" :src="recordImg" class="record"/>
           <text v-if="showSpokenAnswer === 1" class="evaluationAccuracy">{{ evaluationAccuracy }}</text>
@@ -584,9 +583,6 @@ export default {
                   audioText: this.question.audioText,
                   studentAnswer: answerNormalLink
                 }]).then((res) => {
-                  //#ifdef H5
-                  this.$refs.audio.audioSrc = answerNormalLink
-                  //#endif
                   this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
                 })
               })

@@ -87,7 +87,7 @@
 			<text v-if="canRestart" @click="restartAction(true)" class="exitBtn">重做</text>
 		</view>
 		<auth-login
-			:account='account'
+			:account.sync='account'
 			:examId='examId'
 			:needLogin='needLogin'
 			v-on:authLoginSuccess='authLoginSuccess'
@@ -253,19 +253,19 @@ export default {
 	onLoad(options) {
 		uni.getStorageSync('answerGuide') === '' ? this.startAnswerGuide() : () => {} // 判断是否是第一次使用
 		// 调试时打开这句注释下句
-		// const url = 'https://test.xiaocongkj.com/?token=84eb02ef3f4645269384c0b75d0202a8&key=U_E_17_11926&userId=11926&studentId=11957&examId=2869&mainNum=1&className=0821一班&courseName=0821教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Assignment&restart=true'
+		const url = 'https://test.xiaocongkj.com/?token=9dd731f160134648b7d30f3941fb8db0&key=U_E_17_11926&userId=11926&studentId=11957&examId=2898&mainNum=1&className=0825一班&courseName=0825教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Exercise&restart=true'
 		// #ifndef H5
-		const url = decodeURIComponent(options.q)
+		// const url = decodeURIComponent(options.q)
 		// #endif
 		// #ifdef H5
-		const url = decodeURIComponent(location.href)
+		// const url = decodeURIComponent(location.href)
 		// #endif
 		const q = decodeURIComponent(url)
 		console.log('options', q, options)
 		const p = q !== undefined && q !== '' && q !== null ? parseParamsFromUrl(q) : ''
 		if (
-			'token' in p &&
-			'key' in p &&
+			// 'token' in p &&
+			// 'key' in p &&
 			'mainNum' in p &&
 			'className' in p &&
 			'courseName' in p &&
@@ -289,12 +289,12 @@ export default {
 			this.examRecordDataId = 'examRecordDataId' in p ? Number(p.examRecordDataId) : 0
 			this.studentId = 'studentId' in p ? Number(studentId) : 0
 			this.userId = 'userId' in p ? Number(userId) : 0
-			this.isAnswering = isAnswering === 'true' ? true : isAnswering === 'false' ? false : null
+			this.isAnswering = isAnswering.includes('true') ? true : isAnswering.includes('false') ? false : null
 			this.source = source
 			this.examType = 'examType' in p ? p.examType : ''
 			// 如果属于预习，作业，进门测，课堂练习中的一种则当前考试可以重做
 			this.canRestart = this.examType in ExamType ? true : false
-			this.restart = 'restart' in p && p.restart === 'true' ? true : null // 如果restart是true，则赋值
+			this.restart = 'restart' in p && p.restart.includes('true') ? true : null // 如果restart是true，则赋值
 			this.questionType = 'questionType' in p && this.isAnswering ? p.questionType : ''
 			Main.examId = this.examId
 			Main.userId = this.userId
@@ -307,8 +307,8 @@ export default {
 				this.judgeIsSnapshot()
 			}
 			if (this.account === '') {
-				if (!this.isAnswering && 'account' in p) {
-					this.account = p.account
+				if (!this.isAnswering) {
+					this.account =  'account' in p ? p.account : ''
 					this.needLogin = true
 				} else {
 					this.initExam()

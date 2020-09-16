@@ -47,10 +47,10 @@ export default {
         uni.showLoading({ title: '登录中...' })
         clientOELogin(this.account, this.password).then((res) => {
           console.log('clientLogin', res)
+          uni.hideLoading()
           if (res.code !== undefined && res.code !== '0' && res.code !== 0) {
           } else {
             // 如果是OE还是用二维码中的token
-            uni.hideLoading()
             const { key, token, userId } = res.user
             const { id } = res.student
             const portrait = res.student.portrait
@@ -80,6 +80,8 @@ export default {
               }
             })
           }
+        }).catch((err) => {
+          uni.hideLoading()
         })
       }
     }

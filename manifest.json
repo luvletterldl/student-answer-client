@@ -52,11 +52,12 @@
     },
     "h5" : {
         "devServer" : {
-            "disableHostCheck" : true
+            "disableHostCheck" : true,
+            "https" : true
         },
         "router" : {
             "mode" : "hash",
-            "base" : ""
+            "base" : "./"
         },
         "optimization" : {
             "treeShaking" : {
@@ -64,6 +65,6 @@
             }
         },
         "title" : "优学答答题",
-        "domain" : "http://192.168.0.32:5000"
+        "domain" : "http://student-answer-web.520haoxue.com"
     }
 }

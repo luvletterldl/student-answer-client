@@ -48,6 +48,9 @@
         "setting" : {
             "urlCheck" : false,
             "minified" : true
+        },
+        "uniStatistics" : {
+            "enable" : true
         }
     },
     "h5" : {

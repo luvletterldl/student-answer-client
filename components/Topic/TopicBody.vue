@@ -457,6 +457,7 @@ export default {
 			  count: 1,
         sizeType: ['compressed'],
 			}).then((res) => {
+        console.log(res)
         if (res[0] === null) {
           uni.showLoading({
             title: '上传中...',

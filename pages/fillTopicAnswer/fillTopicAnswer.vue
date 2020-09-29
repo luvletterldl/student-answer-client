@@ -27,7 +27,6 @@ import {
   header,
 } from "../../lib/Api.js";
 const windowWidth = uni.getSystemInfoSync().windowWidth;
-const imgPreUrl = `${Main.host}api/k12/wx/getImage?filePath=`;
 export default {
   data() {
     return {
@@ -65,11 +64,11 @@ export default {
     ) {
       uni
         .getImageInfo({
-          src: `${imgPreUrl}${answer}`,
+          src: `${Main.host}api/k12/wx/getImage?filePath=${answer}`,
         })
         .then((res) => {
           console.log(res);
-          this.ctx.drawImage(res[1].path, 0, 0, windowWidth, 400);
+          this.ctx.drawImage(res[1].path, 0, 0, windowWidth, windowWidth);
           this.ctx.draw(true);
         });
     }
@@ -113,7 +112,7 @@ export default {
           console.log("first", res[1].tempFilePath);
           //#ifndef H5
           const tempFilePath = res[1].tempFilePath;
-          this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, 400);
+          this.ctx.drawImage(tempFilePath, 0, 0, windowWidth, windowWidth);
           //#endif
           //#ifdef H5
           const blob = dataURItoBlob(res[1].tempFilePath);

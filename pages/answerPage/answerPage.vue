@@ -326,7 +326,7 @@ export default {
       ? this.startAnswerGuide()
       : () => {}; // 判断是否是第一次使用
     // 调试时打开这句注释下句
-    // const url = "https://test.xiaocongkj.com/?token=350e485f90b84bf38f3784eccb4588f4&key=U_S_17_12600&userId=12600&studentId=12635&examId=3222&mainNum=1&className=入库班级二&courseName=语文入库题目1601025692549&currentLessonNumber=课次一&isAnswering=false&account=13312345610&source=OA&examType=Assignment";
+    // const url = "https://test.xiaocongkj.com/?token=e1baf990eedf4f7ab58235d6250a6dfd&key=U_E_17_11926&userId=11926&studentId=11957&examId=2869&mainNum=1&className=0821一班&courseName=0821教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Assignment&restart=true";
     // #ifndef H5
     const url = decodeURIComponent(options.q);
     // #endif

@@ -906,57 +906,6 @@ export default {
         e.tempFilePath
       );
       this.uploadMp3ToAliAction(e);
-      // uploadMp3ToAliOss(this.examRecordDataId, this.question.order, this.question.audioText, e.tempFilePath).then((res) => {
-      //   const data = JSON.parse(res)
-      //   console.log('uploadMp3ToAliOss', data)
-      //   if (data.code !== undefined && data.code !== '0') {
-      //     uni.hideLoading()
-      //     uni.showModal({
-      //       title: '提示',
-      //       content: data.code === '403' ? '登录状态失效，请在其他终端操作' : data.desc,
-      //       showCancel: false,
-      //     })
-      //     if (data.code === '403') {
-      //       getApp().globalData.authStatus = false
-      //     }
-      //     return false
-      //   } else {
-      //     uni.hideLoading()
-      //     uni.showLoading({
-      //       title: '评测中...'
-      //     })
-      //     const answerNormalLink = data.data.answerNormalLink
-      //     console.log('uploadMp3ToAliOss', data)
-      //     const getResult = () => getSpokenAnswerResult(data.data.id).then((resp) => {
-      //       console.log('getSpokenAnswerResult', resp)
-      //       const status = resp.data.status
-      //       if (status === 'Evaluating') {
-      //         setTimeout(() => {
-      //           getResult()
-      //         }, 3000)
-      //       } else if (status === 'Finished') {
-      //         this.spokenResult = resp.data.evaluation
-      //         uni.hideLoading()
-      //         currentServerTime().then((serverTime) => {
-      //           examSubmit(this.examId, this.userId, serverTime, [{
-      //             order: this.question.order,
-      //             time: this.time,
-      //             mediaId: data.data.id,
-      //             audioText: this.question.audioText,
-      //             studentAnswer: answerNormalLink
-      //           }]).then((res) => {
-      //             this.$emit('updateQuestionList', JSON.stringify({order: this.question.order, studentAnswer: answerNormalLink, evaluation: this.spokenResult}))
-      //           })
-      //         })
-      //       }
-      //     }).catch((err) => {
-      //       throw new Error(err)
-      //     })
-      //     getResult();
-      //   }
-      // }).catch((err) => {
-      //   throw new Error(err)
-      // })
     },
     onInterruptionBegin(e) {
       console.log(e);

@@ -326,12 +326,12 @@ export default {
       ? this.startAnswerGuide()
       : () => {}; // 判断是否是第一次使用
     // 调试时打开这句注释下句
-    // const url = "https://test.xiaocongkj.com/?token=e1baf990eedf4f7ab58235d6250a6dfd&key=U_E_17_11926&userId=11926&studentId=11957&examId=2869&mainNum=1&className=0821一班&courseName=0821教研一&currentLessonNumber=第1课次&isAnswering=false&account=15911111103&source=OE&examType=Assignment&restart=true";
+    const url = "https://test.xiaocongkj.com/?token=ccdf82b60c4347f4a0eae65223dbb2b6&key=U_E_17_11933&userId=11933&studentId=11964&examId=3180&mainNum=1&className=0911四班&courseName=0831教研二&currentLessonNumber=第1课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false";
     // #ifndef H5
-    const url = decodeURIComponent(options.q);
+    // const url = decodeURIComponent(options.q);
     // #endif
     // #ifdef H5
-    const url = decodeURIComponent(location.href);
+    // const url = decodeURIComponent(location.href);
     // #endif
     const q = decodeURIComponent(url);
     console.log("options", q, options);

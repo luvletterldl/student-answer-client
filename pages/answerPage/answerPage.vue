@@ -94,7 +94,13 @@
         class="submit-store"
         :style="answerGuideIndex === 3 ? 'z-index: 101' : 'z-index: 10'"
       >
-        <button @click="submitTopic" class="submit-topic">上交</button>
+        <button
+          v-show="currentTopicIndex === questionList.length - 1"
+          @click="submitTopic"
+          class="submit-topic"
+        >
+          上交
+        </button>
         <button @click="storeTopic" class="store-submit">暂存</button>
       </view>
     </view>
@@ -326,12 +332,12 @@ export default {
       ? this.startAnswerGuide()
       : () => {}; // 判断是否是第一次使用
     // 调试时打开这句注释下句
-    const url = "https://test.xiaocongkj.com/?token=ccdf82b60c4347f4a0eae65223dbb2b6&key=U_E_17_11933&userId=11933&studentId=11964&examId=3180&mainNum=1&className=0911四班&courseName=0831教研二&currentLessonNumber=第1课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false";
+    // const url = "https://exam.test.xiaocongkj.com/?token=c535c654480f4bbea0fcb4dd6aa1580e&key=U_S_17_11926&userId=11926&studentId=11957&examId=4099&mainNum=1&className=20210120一班&courseName=20210120教研一&currentLessonNumber=1.2&isAnswering=false&account=15911111103&source=OA&examType=Assignment";
     // #ifndef H5
-    // const url = decodeURIComponent(options.q);
+    const url = decodeURIComponent(options.q);
     // #endif
     // #ifdef H5
-    // const url = decodeURIComponent(location.href);
+    const url = decodeURIComponent(location.href);
     // #endif
     const q = decodeURIComponent(url);
     console.log("options", q, options);

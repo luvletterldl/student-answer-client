@@ -95,7 +95,7 @@
         :style="answerGuideIndex === 3 ? 'z-index: 101' : 'z-index: 10'"
       >
         <button
-          v-show="currentTopicIndex === questionList.length - 1"
+          v-show="showSubmit"
           @click="submitTopic"
           class="submit-topic"
         >
@@ -122,6 +122,7 @@
     />
     <answer-guide
       :showAnswerGuide="showAnswerGuide"
+	  :showSubmit="showSubmit"
       v-on:answerGuideChangeStep="answerGuideChangeStep"
       v-on:hideAnswerGuide="hideAnswerGuide"
     />
@@ -266,6 +267,9 @@ export default {
     };
   },
   computed: {
+	showSubmit() {
+	  return this.currentTopicIndex === this.questionList.length - 1
+	},
     // 当前题目
     currentTopic() {
       if (
@@ -332,7 +336,7 @@ export default {
       ? this.startAnswerGuide()
       : () => {}; // 判断是否是第一次使用
     // 调试时打开这句注释下句
-    // const url = "https://exam.test.xiaocongkj.com/?token=c535c654480f4bbea0fcb4dd6aa1580e&key=U_S_17_11926&userId=11926&studentId=11957&examId=4099&mainNum=1&className=20210120一班&courseName=20210120教研一&currentLessonNumber=1.2&isAnswering=false&account=15911111103&source=OA&examType=Assignment";
+    // const url = "https://exam.test.xiaocongkj.com/?token=449506190cbd449bb327b2421d3e8aa3&key=U_E_17_11933&userId=11933&studentId=11964&examId=3965&mainNum=1&className=20201228一班&courseName=20201228教研一&currentLessonNumber=第2课次&isAnswering=false&account=15911111109&source=OE&examType=Exercise&restart=false";
     // #ifndef H5
     const url = decodeURIComponent(options.q);
     // #endif

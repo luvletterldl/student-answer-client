@@ -28,8 +28,8 @@
       </view>
     </view>
     <view v-if="guideIndex === 3" class="submitStore">
-      <view class="title">上交和暂存按钮</view>
-      <view class="desc">点击上交可以结束考试并提交答案，点击暂存可以保存已作答的信息</view>
+      <view class="title">{{ showSubmit ? '上交和' : '' }}暂存按钮</view>
+      <view class="desc">{{ showSubmit ? '点击上交可以结束考试并提交答案，如遇紧急事情，可以点击暂存保存已作答的信息' : '如遇紧急事情，可点击暂存保存已做答题目信息'}}</view>
       <view class="options">
         <button size='mini' @click="closeGuide">关闭</button>
         <button size='mini' @click="prevStep">上一步</button>
@@ -51,6 +51,9 @@ export default {
     answerGuideChangeStep: {
       type: Function,
     },
+	showSubmit: {
+	  type: Boolean
+	},
     hideAnswerGuide: {
       type: Function,
     }
